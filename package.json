@@ -17,11 +17,7 @@
     "expo-blur": "~14.1.4",
     "expo-camera": "~16.1.6",
     "expo-constants": "~17.1.4",
-<<<<<<< HEAD
     "expo-font": "~14.0.8",
-=======
-    "expo-font": "~12.7.0",
->>>>>>> cff6985db525481ccab8a6b3f0e3c8efeafe20c4
     "expo-haptics": "~14.1.4",
     "expo-linear-gradient": "~14.1.4",
     "expo-linking": "~7.1.4",
