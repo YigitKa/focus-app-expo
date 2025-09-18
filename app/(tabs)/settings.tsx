@@ -194,8 +194,6 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundImage: 'linear-gradient(rgba(0,255,102,0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(0,255,102,0.05) 1px, transparent 1px)',
-    backgroundSize: '30px 30px',
   },
   header: {
     alignItems: 'center',

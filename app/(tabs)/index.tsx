@@ -22,11 +22,11 @@ export default function TimerScreen() {
   const glowAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    let interval: NodeJS.Timeout | null = null;
+    let interval: ReturnType<typeof setInterval> | null = null;
     
     if (isActive && timeLeft > 0) {
       interval = setInterval(() => {
-        setTimeLeft(timeLeft - 1);
+        setTimeLeft(prev => prev - 1);
       }, 1000);
     } else if (timeLeft === 0) {
       setIsActive(false);
@@ -180,8 +180,6 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundImage: 'linear-gradient(rgba(255,0,255,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,0,255,0.1) 1px, transparent 1px)',
-    backgroundSize: '20px 20px',
   },
   header: {
     alignItems: 'center',
