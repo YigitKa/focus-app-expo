@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -8,9 +8,14 @@ import {
   Switch,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { s, vs, ms } from '@/lib/responsive';
+import { t, resolveLang } from '@/lib/i18n';
+import { usePrefs } from '@/context/PrefsContext';
 import { Volume2, VolumeX, Vibrate, Bell, Clock, Settings2 } from 'lucide-react-native';
 
 export default function SettingsScreen() {
+  const { prefs, updatePrefs } = usePrefs();
+  const uiLang = resolveLang(prefs.language);
   const [settings, setSettings] = useState({
     soundEnabled: true,
     vibrateEnabled: true,
@@ -20,6 +25,16 @@ export default function SettingsScreen() {
     shortBreakDuration: 5,
     longBreakDuration: 15,
   });
+
+  // Sync local UI state with persisted prefs (for timer durations)
+  useEffect(() => {
+    setSettings(prev => ({
+      ...prev,
+      workDuration: prefs.workDuration,
+      shortBreakDuration: prefs.shortBreakDuration,
+      longBreakDuration: prefs.longBreakDuration,
+    }));
+  }, [prefs.workDuration, prefs.shortBreakDuration, prefs.longBreakDuration]);
 
   const updateSetting = (key: string, value: any) => {
     setSettings(prev => ({ ...prev, [key]: value }));
@@ -94,20 +109,50 @@ export default function SettingsScreen() {
       <View style={styles.gridOverlay} />
       
       <View style={styles.header}>
-        <Text style={styles.title}>SYSTEM CONFIG</Text>
-        <Text style={styles.subtitle}>CUSTOMIZE PARAMETERS</Text>
+        <Text style={styles.title}>{t('settings.title', uiLang)}</Text>
+        <Text style={styles.subtitle}>{t('settings.subtitle', uiLang)}</Text>
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>AUDIO & FEEDBACK</Text>
+          <Text style={styles.sectionTitle}>{t('settings.language', uiLang)}</Text>
+          <View style={styles.languageRow}>
+            <TouchableOpacity
+              onPress={() => updatePrefs({ language: 'system' })}
+              style={[styles.langPill, prefs.language === 'system' && styles.langPillActive]}
+            >
+              <Text style={[styles.langText, prefs.language === 'system' && styles.langTextActive]}>
+                {t('settings.system', uiLang)}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => updatePrefs({ language: 'tr' })}
+              style={[styles.langPill, prefs.language === 'tr' && styles.langPillActive]}
+            >
+              <Text style={[styles.langText, prefs.language === 'tr' && styles.langTextActive]}>
+                {t('settings.turkish', uiLang)}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => updatePrefs({ language: 'en' })}
+              style={[styles.langPill, prefs.language === 'en' && styles.langPillActive]}
+            >
+              <Text style={[styles.langText, prefs.language === 'en' && styles.langTextActive]}>
+                {t('settings.english', uiLang)}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>{t('settings.audio', uiLang)}</Text>
           
           <SettingRow
             icon={settings.soundEnabled ? 
               <Volume2 size={24} color="#00FFFF" strokeWidth={2} /> :
               <VolumeX size={24} color="#666699" strokeWidth={2} />
             }
-            title="SOUND EFFECTS"
+            title={t('settings.sound', uiLang)}
             subtitle="Play audio notifications"
             value={settings.soundEnabled}
             onToggle={() => updateSetting('soundEnabled', !settings.soundEnabled)}
@@ -115,7 +160,7 @@ export default function SettingsScreen() {
 
           <SettingRow
             icon={<Vibrate size={24} color="#FF00FF" strokeWidth={2} />}
-            title="HAPTIC FEEDBACK"
+            title={t('settings.haptics', uiLang)}
             subtitle="Vibrate on timer events"
             value={settings.vibrateEnabled}
             onToggle={() => updateSetting('vibrateEnabled', !settings.vibrateEnabled)}
@@ -123,7 +168,7 @@ export default function SettingsScreen() {
 
           <SettingRow
             icon={<Bell size={24} color="#FFFF00" strokeWidth={2} />}
-            title="NOTIFICATIONS"
+            title={t('settings.notifications', uiLang)}
             subtitle="Push notifications for breaks"
             value={settings.notificationsEnabled}
             onToggle={() => updateSetting('notificationsEnabled', !settings.notificationsEnabled)}
@@ -131,51 +176,70 @@ export default function SettingsScreen() {
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>TIMER SETTINGS</Text>
+          <Text style={styles.sectionTitle}>{t('settings.timers', uiLang)}</Text>
           
           <SettingRow
             icon={<Clock size={24} color="#00FF66" strokeWidth={2} />}
-            title="AUTO BREAKS"
+            title={t('settings.autoBreaks', uiLang)}
             subtitle="Automatically start break timers"
             value={settings.autoBreaks}
             onToggle={() => updateSetting('autoBreaks', !settings.autoBreaks)}
           />
 
           <TimerSetting
-            title="WORK SESSION"
+            title={t('settings.work', uiLang)}
             value={settings.workDuration}
-            onIncrease={() => updateSetting('workDuration', Math.min(60, settings.workDuration + 5))}
-            onDecrease={() => updateSetting('workDuration', Math.max(5, settings.workDuration - 5))}
+            onIncrease={() => {
+              const val = Math.min(60, settings.workDuration + 5);
+              updateSetting('workDuration', val);
+              updatePrefs({ workDuration: val });
+            }}
+            onDecrease={() => {
+              const val = Math.max(5, settings.workDuration - 5);
+              updateSetting('workDuration', val);
+              updatePrefs({ workDuration: val });
+            }}
           />
 
           <TimerSetting
-            title="SHORT BREAK"
+            title={t('settings.shortBreak', uiLang)}
             value={settings.shortBreakDuration}
-            onIncrease={() => updateSetting('shortBreakDuration', Math.min(15, settings.shortBreakDuration + 1))}
-            onDecrease={() => updateSetting('shortBreakDuration', Math.max(1, settings.shortBreakDuration - 1))}
+            onIncrease={() => {
+              const val = Math.min(15, settings.shortBreakDuration + 1);
+              updateSetting('shortBreakDuration', val);
+              updatePrefs({ shortBreakDuration: val });
+            }}
+            onDecrease={() => {
+              const val = Math.max(1, settings.shortBreakDuration - 1);
+              updateSetting('shortBreakDuration', val);
+              updatePrefs({ shortBreakDuration: val });
+            }}
           />
 
           <TimerSetting
-            title="LONG BREAK"
+            title={t('settings.longBreak', uiLang)}
             value={settings.longBreakDuration}
-            onIncrease={() => updateSetting('longBreakDuration', Math.min(30, settings.longBreakDuration + 5))}
-            onDecrease={() => updateSetting('longBreakDuration', Math.max(5, settings.longBreakDuration - 5))}
+            onIncrease={() => {
+              const val = Math.min(30, settings.longBreakDuration + 5);
+              updateSetting('longBreakDuration', val);
+              updatePrefs({ longBreakDuration: val });
+            }}
+            onDecrease={() => {
+              const val = Math.max(5, settings.longBreakDuration - 5);
+              updateSetting('longBreakDuration', val);
+              updatePrefs({ longBreakDuration: val });
+            }}
           />
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>ABOUT</Text>
+          <Text style={styles.sectionTitle}>{t('settings.about', uiLang)}</Text>
           
           <View style={styles.aboutCard}>
             <Settings2 size={32} color="#00FFFF" strokeWidth={2} />
             <Text style={styles.aboutTitle}>RETRO FOCUS v1.0</Text>
-            <Text style={styles.aboutText}>
-              A productivity app inspired by{'\n'}
-              classic computing aesthetics
-            </Text>
-            <Text style={styles.aboutSubtext}>
-              Built with React Native & Expo
-            </Text>
+            <Text style={styles.aboutText}>{t('about.text', uiLang)}</Text>
+            <Text style={styles.aboutSubtext}>{t('about.subtext', uiLang)}</Text>
           </View>
         </View>
       </ScrollView>
@@ -186,7 +250,7 @@ export default function SettingsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    paddingTop: 60,
+    paddingTop: vs(48),
   },
   gridOverlay: {
     position: 'absolute',
@@ -197,11 +261,11 @@ const styles = StyleSheet.create({
   },
   header: {
     alignItems: 'center',
-    paddingVertical: 20,
+    paddingVertical: vs(16),
   },
   title: {
     fontFamily: 'Courier New',
-    fontSize: 26,
+    fontSize: ms(22),
     fontWeight: 'bold',
     color: '#00FF66',
     letterSpacing: 3,
@@ -210,25 +274,50 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     fontFamily: 'Courier New',
-    fontSize: 14,
+    fontSize: ms(12),
     color: '#666699',
     letterSpacing: 1,
     marginTop: 8,
   },
   content: {
     flex: 1,
-    paddingHorizontal: 20,
+    paddingHorizontal: s(16),
   },
   section: {
-    marginBottom: 30,
+    marginBottom: vs(20),
   },
   sectionTitle: {
     fontFamily: 'Courier New',
-    fontSize: 16,
+    fontSize: ms(14),
     fontWeight: 'bold',
     color: '#FF00FF',
     letterSpacing: 2,
-    marginBottom: 16,
+    marginBottom: vs(12),
+  },
+  languageRow: {
+    flexDirection: 'row',
+    gap: s(8),
+  },
+  langPill: {
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderWidth: 1,
+    borderColor: '#333366',
+    borderRadius: 16,
+    paddingHorizontal: s(10),
+    paddingVertical: s(6),
+  },
+  langPillActive: {
+    borderColor: '#00FFFF',
+    backgroundColor: 'rgba(0,255,255,0.12)',
+  },
+  langText: {
+    fontFamily: 'Courier New',
+    fontSize: ms(12),
+    color: '#888899',
+  },
+  langTextActive: {
+    color: '#00FFFF',
+    fontWeight: 'bold',
   },
   settingRow: {
     flexDirection: 'row',
@@ -237,25 +326,25 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#333366',
     borderRadius: 8,
-    padding: 16,
-    marginBottom: 12,
+    padding: s(12),
+    marginBottom: vs(10),
   },
   settingIcon: {
-    marginRight: 16,
+    marginRight: s(12),
   },
   settingContent: {
     flex: 1,
   },
   settingTitle: {
     fontFamily: 'Courier New',
-    fontSize: 14,
+    fontSize: ms(12),
     fontWeight: 'bold',
     color: '#FFFFFF',
     letterSpacing: 1,
   },
   settingSubtitle: {
     fontFamily: 'Courier New',
-    fontSize: 12,
+    fontSize: ms(11),
     color: '#888899',
     marginTop: 4,
   },
@@ -267,12 +356,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#00FFFF',
     borderRadius: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingHorizontal: s(10),
+    paddingVertical: s(6),
   },
   valueText: {
     fontFamily: 'Courier New',
-    fontSize: 14,
+    fontSize: ms(12),
     color: '#00FFFF',
     fontWeight: 'bold',
   },
@@ -281,16 +370,16 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#333366',
     borderRadius: 8,
-    padding: 16,
-    marginBottom: 12,
+    padding: s(12),
+    marginBottom: vs(10),
   },
   timerTitle: {
     fontFamily: 'Courier New',
-    fontSize: 14,
+    fontSize: ms(12),
     fontWeight: 'bold',
     color: '#FFFFFF',
     letterSpacing: 1,
-    marginBottom: 12,
+    marginBottom: vs(8),
   },
   timerControls: {
     flexDirection: 'row',
@@ -298,24 +387,24 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   timerButton: {
-    width: 40,
-    height: 40,
+    width: s(36),
+    height: s(36),
     backgroundColor: 'rgba(255,0,255,0.2)',
     borderWidth: 2,
     borderColor: '#FF00FF',
-    borderRadius: 20,
+    borderRadius: s(18),
     alignItems: 'center',
     justifyContent: 'center',
   },
   timerButtonText: {
     fontFamily: 'Courier New',
-    fontSize: 20,
+    fontSize: ms(18),
     fontWeight: 'bold',
     color: '#FF00FF',
   },
   timerValue: {
     fontFamily: 'Courier New',
-    fontSize: 18,
+    fontSize: ms(16),
     fontWeight: 'bold',
     color: '#FFFF00',
     letterSpacing: 1,
@@ -325,29 +414,29 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: '#00FFFF',
     borderRadius: 12,
-    padding: 20,
+    padding: s(16),
     alignItems: 'center',
   },
   aboutTitle: {
     fontFamily: 'Courier New',
-    fontSize: 18,
+    fontSize: ms(16),
     fontWeight: 'bold',
     color: '#00FFFF',
     letterSpacing: 2,
-    marginTop: 12,
-    marginBottom: 8,
+    marginTop: vs(10),
+    marginBottom: vs(8),
   },
   aboutText: {
     fontFamily: 'Courier New',
-    fontSize: 14,
+    fontSize: ms(12),
     color: '#FFFFFF',
     textAlign: 'center',
-    lineHeight: 20,
-    marginBottom: 12,
+    lineHeight: vs(18),
+    marginBottom: vs(10),
   },
   aboutSubtext: {
     fontFamily: 'Courier New',
-    fontSize: 12,
+    fontSize: ms(11),
     color: '#666699',
     letterSpacing: 1,
   },

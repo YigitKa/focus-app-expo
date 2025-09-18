@@ -1,7 +1,18 @@
 import { Tabs } from 'expo-router';
+import { useWindowDimensions } from 'react-native';
 import { Timer, SquareCheck as CheckSquare, ChartBar as BarChart3, Settings } from 'lucide-react-native';
+import { s, ms, msc, clamp } from '@/lib/responsive';
+import { t, resolveLang } from '@/lib/i18n';
+import { usePrefs } from '@/context/PrefsContext';
 
 export default function TabLayout() {
+  const { width } = useWindowDimensions();
+  const isTablet = width >= 768;
+  const tabHeight = clamp(s(56), 52, 64);
+  const tabPaddingV = clamp(s(8), 6, 10);
+  const labelSize = msc(isTablet ? 12 : 11, 10, 12);
+  const { prefs } = usePrefs();
+  const uiLang = resolveLang(prefs.language);
   return (
     <Tabs
       screenOptions={{
@@ -10,22 +21,24 @@ export default function TabLayout() {
           backgroundColor: '#000011',
           borderTopColor: '#FF00FF',
           borderTopWidth: 2,
-          height: 70,
-          paddingBottom: 10,
-          paddingTop: 10,
+          height: tabHeight,
+          paddingBottom: tabPaddingV,
+          paddingTop: tabPaddingV,
         },
         tabBarActiveTintColor: '#00FFFF',
         tabBarInactiveTintColor: '#666699',
         tabBarLabelStyle: {
           fontFamily: 'Courier New',
-          fontSize: 12,
+          fontSize: Math.max(13, labelSize),
           fontWeight: 'bold',
+          letterSpacing: 1,
         },
+        tabBarItemStyle: { paddingVertical: 4 },
       }}>
       <Tabs.Screen
         name="index"
         options={{
-          title: 'TIMER',
+          title: t('tabs.timer', uiLang).toUpperCase(),
           tabBarIcon: ({ size, color }) => (
             <Timer size={size} color={color} strokeWidth={2} />
           ),
@@ -34,7 +47,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="tasks"
         options={{
-          title: 'TASKS',
+          title: t('tabs.tasks', uiLang).toUpperCase(),
           tabBarIcon: ({ size, color }) => (
             <CheckSquare size={size} color={color} strokeWidth={2} />
           ),
@@ -43,7 +56,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="stats"
         options={{
-          title: 'STATS',
+          title: t('tabs.stats', uiLang).toUpperCase(),
           tabBarIcon: ({ size, color }) => (
             <BarChart3 size={size} color={color} strokeWidth={2} />
           ),
@@ -52,7 +65,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="settings"
         options={{
-          title: 'CONFIG',
+          title: t('tabs.settings', uiLang).toUpperCase(),
           tabBarIcon: ({ size, color }) => (
             <Settings size={size} color={color} strokeWidth={2} />
           ),

@@ -10,6 +10,9 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Plus, Check, X } from 'lucide-react-native';
+import { s, vs, ms } from '@/lib/responsive';
+import { t, resolveLang } from '@/lib/i18n';
+import { usePrefs } from '@/context/PrefsContext';
 
 interface Task {
   id: string;
@@ -19,6 +22,8 @@ interface Task {
 }
 
 export default function TasksScreen() {
+  const { prefs } = usePrefs();
+  const uiLang = resolveLang(prefs.language);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [newTaskText, setNewTaskText] = useState('');
   const [isAddingTask, setIsAddingTask] = useState(false);
@@ -57,7 +62,7 @@ export default function TasksScreen() {
         style={[styles.checkbox, item.completed && styles.checkedBox]}
         onPress={() => toggleTask(item.id)}
       >
-        {item.completed && <Check size={16} color="#000011" strokeWidth={3} />}
+        {item.completed && <Check size={ms(14)} color="#000011" strokeWidth={3} />}
       </TouchableOpacity>
       
       <Text style={[styles.taskText, item.completed && styles.completedText]}>
@@ -68,7 +73,7 @@ export default function TasksScreen() {
         style={styles.deleteButton}
         onPress={() => deleteTask(item.id)}
       >
-        <X size={20} color="#FF0066" strokeWidth={2} />
+        <X size={ms(18)} color="#FF0066" strokeWidth={2} />
       </TouchableOpacity>
     </View>
   );
@@ -78,13 +83,13 @@ export default function TasksScreen() {
       <View style={styles.gridOverlay} />
       
       <View style={styles.header}>
-        <Text style={styles.title}>TASK QUEUE</Text>
+        <Text style={styles.title}>{t('tasks.title', uiLang)}</Text>
         <View style={styles.statsContainer}>
           <Text style={styles.statText}>
-            COMPLETED: <Text style={styles.statNumber}>{completedCount}</Text>
+            {t('tasks.completed', uiLang)}: <Text style={styles.statNumber}>{completedCount}</Text>
           </Text>
           <Text style={styles.statText}>
-            TOTAL: <Text style={styles.statNumber}>{tasks.length}</Text>
+            {t('tasks.total', uiLang)}: <Text style={styles.statNumber}>{tasks.length}</Text>
           </Text>
         </View>
       </View>
@@ -96,7 +101,7 @@ export default function TasksScreen() {
               style={styles.taskInput}
               value={newTaskText}
               onChangeText={setNewTaskText}
-              placeholder="ENTER TASK NAME..."
+              placeholder={t('tasks.placeholder', uiLang)}
               placeholderTextColor="#666699"
               autoFocus
               multiline
@@ -104,7 +109,7 @@ export default function TasksScreen() {
             />
             <View style={styles.addTaskButtons}>
               <TouchableOpacity style={styles.actionButton} onPress={addTask}>
-                <Check size={24} color="#00FFFF" strokeWidth={2} />
+                <Check size={ms(20)} color="#00FFFF" strokeWidth={2} />
               </TouchableOpacity>
               <TouchableOpacity 
                 style={styles.actionButton} 
@@ -113,7 +118,7 @@ export default function TasksScreen() {
                   setNewTaskText('');
                 }}
               >
-                <X size={24} color="#FF0066" strokeWidth={2} />
+                <X size={ms(20)} color="#FF0066" strokeWidth={2} />
               </TouchableOpacity>
             </View>
           </View>
@@ -122,8 +127,8 @@ export default function TasksScreen() {
             style={styles.addButton}
             onPress={() => setIsAddingTask(true)}
           >
-            <Plus size={24} color="#00FFFF" strokeWidth={2} />
-            <Text style={styles.addButtonText}>ADD NEW TASK</Text>
+            <Plus size={ms(20)} color="#00FFFF" strokeWidth={2} />
+            <Text style={styles.addButtonText}>{t('tasks.addNew', uiLang)}</Text>
           </TouchableOpacity>
         )}
 
@@ -143,7 +148,7 @@ export default function TasksScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    paddingTop: 60,
+    paddingTop: vs(48),
   },
   gridOverlay: {
     position: 'absolute',
@@ -154,12 +159,12 @@ const styles = StyleSheet.create({
   },
   header: {
     alignItems: 'center',
-    paddingVertical: 20,
-    paddingHorizontal: 20,
+    paddingVertical: vs(16),
+    paddingHorizontal: s(16),
   },
   title: {
     fontFamily: 'Courier New',
-    fontSize: 28,
+    fontSize: ms(24),
     fontWeight: 'bold',
     color: '#00FFFF',
     letterSpacing: 3,
@@ -168,12 +173,12 @@ const styles = StyleSheet.create({
   },
   statsContainer: {
     flexDirection: 'row',
-    gap: 20,
-    marginTop: 15,
+    gap: s(16),
+    marginTop: vs(10),
   },
   statText: {
     fontFamily: 'Courier New',
-    fontSize: 14,
+    fontSize: ms(12),
     color: '#666699',
     letterSpacing: 1,
   },
@@ -183,23 +188,23 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    paddingHorizontal: 20,
+    paddingHorizontal: s(16),
   },
   addButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 16,
+    padding: s(12),
     backgroundColor: 'rgba(0,255,255,0.1)',
     borderWidth: 2,
     borderColor: '#00FFFF',
     borderRadius: 8,
-    marginBottom: 20,
-    gap: 10,
+    marginBottom: vs(12),
+    gap: s(8),
   },
   addButtonText: {
     fontFamily: 'Courier New',
-    fontSize: 16,
+    fontSize: ms(14),
     fontWeight: 'bold',
     color: '#00FFFF',
     letterSpacing: 1,
@@ -209,26 +214,26 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: '#FF00FF',
     borderRadius: 8,
-    padding: 16,
-    marginBottom: 20,
+    padding: s(12),
+    marginBottom: vs(12),
   },
   taskInput: {
     fontFamily: 'Courier New',
-    fontSize: 16,
+    fontSize: ms(14),
     color: '#FFFFFF',
-    minHeight: 60,
+    minHeight: vs(60),
     textAlignVertical: 'top',
   },
   addTaskButtons: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
-    gap: 10,
-    marginTop: 10,
+    gap: s(8),
+    marginTop: vs(8),
   },
   actionButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: s(36),
+    height: s(36),
+    borderRadius: s(18),
     backgroundColor: 'rgba(255,255,255,0.1)',
     alignItems: 'center',
     justifyContent: 'center',
@@ -237,31 +242,31 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   taskListContent: {
-    paddingBottom: 100,
+    paddingBottom: vs(80),
   },
   taskItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
+    padding: s(12),
     backgroundColor: 'rgba(255,255,255,0.05)',
     borderWidth: 1,
     borderColor: '#333366',
     borderRadius: 8,
-    marginBottom: 12,
+    marginBottom: vs(10),
   },
   completedTask: {
     borderColor: '#00FF66',
     backgroundColor: 'rgba(0,255,102,0.1)',
   },
   checkbox: {
-    width: 24,
-    height: 24,
+    width: s(22),
+    height: s(22),
     borderWidth: 2,
     borderColor: '#00FFFF',
     borderRadius: 4,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 12,
+    marginRight: s(10),
   },
   checkedBox: {
     backgroundColor: '#00FFFF',
@@ -269,7 +274,7 @@ const styles = StyleSheet.create({
   taskText: {
     flex: 1,
     fontFamily: 'Courier New',
-    fontSize: 16,
+    fontSize: ms(14),
     color: '#FFFFFF',
     letterSpacing: 0.5,
   },
@@ -278,6 +283,6 @@ const styles = StyleSheet.create({
     textDecorationLine: 'line-through',
   },
   deleteButton: {
-    padding: 4,
+    padding: s(4),
   },
 });

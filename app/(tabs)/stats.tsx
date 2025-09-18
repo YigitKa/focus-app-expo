@@ -4,14 +4,18 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  Dimensions,
+  useWindowDimensions,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Trophy, Target, Clock, Zap } from 'lucide-react-native';
-
-const { width } = Dimensions.get('window');
+import { s, vs, ms } from '@/lib/responsive';
+import { t, resolveLang } from '@/lib/i18n';
+import { usePrefs } from '@/context/PrefsContext';
 
 export default function StatsScreen() {
+  const { width: winW } = useWindowDimensions();
+  const { prefs } = usePrefs();
+  const uiLang = resolveLang(prefs.language);
   const [stats, setStats] = useState({
     totalSessions: 147,
     totalFocusTime: 3675, // in minutes
@@ -39,7 +43,10 @@ export default function StatsScreen() {
     subtitle: string;
     color?: string;
   }) => (
-    <View style={[styles.statCard, { borderColor: color }]}>
+    <View style={[
+      styles.statCard, 
+      { borderColor: color, width: (winW - s(50)) / 2 }
+    ]}>
       <View style={[styles.iconContainer, { backgroundColor: `${color}20` }]}>
         {icon}
       </View>
@@ -86,36 +93,36 @@ export default function StatsScreen() {
       <View style={styles.gridOverlay} />
       
       <View style={styles.header}>
-        <Text style={styles.title}>PRODUCTIVITY MATRIX</Text>
-        <Text style={styles.subtitle}>PERFORMANCE ANALYTICS</Text>
+        <Text style={styles.title}>{t('stats.title', uiLang)}</Text>
+        <Text style={styles.subtitle}>{t('stats.subtitle', uiLang)}</Text>
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.statsGrid}>
           <StatCard
             icon={<Clock size={32} color="#FF00FF" strokeWidth={2} />}
-            title="FOCUS TIME"
+            title={t('stats.focusTime', uiLang)}
             value={formatTime(stats.totalFocusTime)}
             subtitle="Total Hours"
             color="#FF00FF"
           />
           <StatCard
             icon={<Target size={32} color="#00FFFF" strokeWidth={2} />}
-            title="SESSIONS"
+            title={t('stats.sessions', uiLang)}
             value={stats.totalSessions.toString()}
             subtitle="Completed"
             color="#00FFFF"
           />
           <StatCard
             icon={<Zap size={32} color="#FFFF00" strokeWidth={2} />}
-            title="STREAK"
+            title={t('stats.streak', uiLang)}
             value={`${stats.streakDays}`}
             subtitle="Days"
             color="#FFFF00"
           />
           <StatCard
             icon={<Trophy size={32} color="#00FF66" strokeWidth={2} />}
-            title="TASKS"
+            title={t('stats.tasks', uiLang)}
             value={stats.completedTasks.toString()}
             subtitle="Completed"
             color="#00FF66"
@@ -123,14 +130,14 @@ export default function StatsScreen() {
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>WEEKLY PROGRESS</Text>
+          <Text style={styles.sectionTitle}>{t('stats.weekly', uiLang)}</Text>
           <ProgressBar label="FOCUS GOALS" percentage={stats.productivity} color="#FF00FF" />
           <ProgressBar label="TASK COMPLETION" percentage={76} color="#00FFFF" />
           <ProgressBar label="CONSISTENCY" percentage={92} color="#FFFF00" />
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>ACHIEVEMENTS</Text>
+          <Text style={styles.sectionTitle}>{t('stats.achievements', uiLang)}</Text>
           {achievements.map((achievement, index) => (
             <View 
               key={index} 
@@ -174,7 +181,7 @@ export default function StatsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    paddingTop: 60,
+    paddingTop: vs(48),
   },
   gridOverlay: {
     position: 'absolute',
@@ -185,11 +192,11 @@ const styles = StyleSheet.create({
   },
   header: {
     alignItems: 'center',
-    paddingVertical: 20,
+    paddingVertical: vs(16),
   },
   title: {
     fontFamily: 'Courier New',
-    fontSize: 24,
+    fontSize: ms(22),
     fontWeight: 'bold',
     color: '#FFFF00',
     letterSpacing: 2,
@@ -198,47 +205,46 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     fontFamily: 'Courier New',
-    fontSize: 14,
+    fontSize: ms(12),
     color: '#666699',
     letterSpacing: 1,
     marginTop: 8,
   },
   content: {
     flex: 1,
-    paddingHorizontal: 20,
+    paddingHorizontal: s(16),
   },
   statsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
-    marginBottom: 30,
+    marginBottom: vs(20),
   },
   statCard: {
-    width: (width - 50) / 2,
     backgroundColor: 'rgba(255,255,255,0.05)',
     borderWidth: 2,
     borderRadius: 12,
-    padding: 16,
+    padding: s(12),
     alignItems: 'center',
-    marginBottom: 15,
+    marginBottom: vs(12),
   },
   iconContainer: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+    width: s(54),
+    height: s(54),
+    borderRadius: s(27),
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 12,
+    marginBottom: vs(10),
   },
   statValue: {
     fontFamily: 'Courier New',
-    fontSize: 20,
+    fontSize: ms(18),
     fontWeight: 'bold',
     marginBottom: 4,
   },
   statTitle: {
     fontFamily: 'Courier New',
-    fontSize: 12,
+    fontSize: ms(11),
     color: '#FFFFFF',
     fontWeight: 'bold',
     letterSpacing: 1,
@@ -246,43 +252,43 @@ const styles = StyleSheet.create({
   },
   statSubtitle: {
     fontFamily: 'Courier New',
-    fontSize: 10,
+    fontSize: ms(10),
     color: '#666699',
     letterSpacing: 0.5,
   },
   section: {
-    marginBottom: 30,
+    marginBottom: vs(20),
   },
   sectionTitle: {
     fontFamily: 'Courier New',
-    fontSize: 18,
+    fontSize: ms(16),
     fontWeight: 'bold',
     color: '#00FFFF',
     letterSpacing: 2,
-    marginBottom: 16,
+    marginBottom: vs(12),
   },
   progressBarContainer: {
-    marginBottom: 20,
+    marginBottom: vs(14),
   },
   progressBarHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 8,
+    marginBottom: vs(6),
   },
   progressLabel: {
     fontFamily: 'Courier New',
-    fontSize: 14,
+    fontSize: ms(12),
     color: '#FFFFFF',
     fontWeight: 'bold',
     letterSpacing: 1,
   },
   progressPercentage: {
     fontFamily: 'Courier New',
-    fontSize: 14,
+    fontSize: ms(12),
     fontWeight: 'bold',
   },
   progressBarTrack: {
-    height: 8,
+    height: s(8),
     backgroundColor: '#333366',
     borderRadius: 4,
     overflow: 'hidden',
@@ -294,30 +300,30 @@ const styles = StyleSheet.create({
   achievementItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
+    padding: s(12),
     borderWidth: 2,
     borderRadius: 8,
-    marginBottom: 12,
+    marginBottom: vs(10),
   },
   achievementText: {
     flex: 1,
-    marginLeft: 12,
+    marginLeft: s(12),
   },
   achievementName: {
     fontFamily: 'Courier New',
-    fontSize: 14,
+    fontSize: ms(12),
     fontWeight: 'bold',
     letterSpacing: 1,
   },
   achievementDescription: {
     fontFamily: 'Courier New',
-    fontSize: 12,
+    fontSize: ms(11),
     color: '#888899',
     marginTop: 4,
   },
   unlockedText: {
     fontFamily: 'Courier New',
-    fontSize: 10,
+    fontSize: ms(10),
     color: '#00FF66',
     fontWeight: 'bold',
     letterSpacing: 1,
