@@ -6,16 +6,20 @@ import {
   ScrollView,
   TouchableOpacity,
   Switch,
+  Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { s, vs, ms } from '@/lib/responsive';
 import { t, resolveLang } from '@/lib/i18n';
 import { usePrefs } from '@/context/PrefsContext';
+import { useSessionStats, DifficultyLevel } from '@/context/SessionStatsContext';
 import { Volume2, VolumeX, Vibrate, Bell, Clock, Settings2 } from 'lucide-react-native';
 
 export default function SettingsScreen() {
   const { prefs, updatePrefs } = usePrefs();
+  const { difficulty, setAchievementDifficulty, resetStats } = useSessionStats();
   const uiLang = resolveLang(prefs.language);
+  const difficultyOptions: DifficultyLevel[] = ['easy', 'normal', 'hard'];
   const [settings, setSettings] = useState({
     soundEnabled: true,
     vibrateEnabled: true,
@@ -38,6 +42,27 @@ export default function SettingsScreen() {
 
   const updateSetting = (key: string, value: any) => {
     setSettings(prev => ({ ...prev, [key]: value }));
+  };
+
+  const handleDifficultySelect = (level: DifficultyLevel) => {
+    if (level !== difficulty) {
+      setAchievementDifficulty(level);
+    }
+  };
+
+  const handleResetStats = () => {
+    Alert.alert(
+      t('settings.resetStats', uiLang),
+      t('settings.resetStatsConfirm', uiLang),
+      [
+        { text: t('common.cancel', uiLang), style: 'cancel' },
+        {
+          text: t('settings.resetStatsConfirmButton', uiLang),
+          style: 'destructive',
+          onPress: () => resetStats({ keepDifficulty: true }),
+        },
+      ],
+    );
   };
 
   const SettingRow = ({ 
@@ -233,6 +258,35 @@ export default function SettingsScreen() {
         </View>
 
         <View style={styles.section}>
+          <Text style={styles.sectionTitle}>{t('settings.achievementDifficulty', uiLang)}</Text>
+          <View style={styles.difficultyRow}>
+            {difficultyOptions.map(level => (
+              <TouchableOpacity
+                key={level}
+                onPress={() => handleDifficultySelect(level)}
+                style={[
+                  styles.difficultyPill,
+                  difficulty === level && styles.difficultyPillActive,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.difficultyText,
+                    difficulty === level && styles.difficultyTextActive,
+                  ]}
+                >
+                  {t(`difficulty.${level}`, uiLang)}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          <TouchableOpacity style={styles.resetButton} onPress={handleResetStats}>
+            <Text style={styles.resetButtonText}>{t('settings.resetStats', uiLang)}</Text>
+          </TouchableOpacity>
+          <Text style={styles.resetHint}>{t('settings.resetStatsHint', uiLang)}</Text>
+        </View>
+
+        <View style={styles.section}>
           <Text style={styles.sectionTitle}>{t('settings.about', uiLang)}</Text>
           
           <View style={styles.aboutCard}>
@@ -318,6 +372,58 @@ const styles = StyleSheet.create({
   langTextActive: {
     color: '#00FFFF',
     fontWeight: 'bold',
+  },
+  difficultyRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: s(10),
+    marginTop: vs(12),
+  },
+  difficultyPill: {
+    paddingHorizontal: s(14),
+    paddingVertical: vs(8),
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#333366',
+    backgroundColor: 'rgba(255,255,255,0.05)',
+  },
+  difficultyPillActive: {
+    borderColor: '#00FFFF',
+    backgroundColor: 'rgba(0,255,255,0.15)',
+  },
+  difficultyText: {
+    fontFamily: 'Courier New',
+    fontSize: ms(12),
+    color: '#C3C7FF',
+    letterSpacing: 1,
+  },
+  difficultyTextActive: {
+    color: '#00FFFF',
+    fontWeight: 'bold',
+  },
+  resetButton: {
+    marginTop: vs(16),
+    paddingVertical: vs(10),
+    alignItems: 'center',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#FF00FF',
+    backgroundColor: 'rgba(255,0,255,0.12)',
+  },
+  resetButtonText: {
+    fontFamily: 'Courier New',
+    fontSize: ms(12),
+    fontWeight: 'bold',
+    color: '#FF00FF',
+    letterSpacing: 1,
+  },
+  resetHint: {
+    fontFamily: 'Courier New',
+    fontSize: ms(10),
+    color: '#666699',
+    marginTop: vs(8),
+    textAlign: 'center',
+    lineHeight: vs(14),
   },
   settingRow: {
     flexDirection: 'row',

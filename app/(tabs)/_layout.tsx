@@ -1,7 +1,7 @@
 import { Tabs } from 'expo-router';
 import { useWindowDimensions } from 'react-native';
 import { Timer, SquareCheck as CheckSquare, ChartBar as BarChart3, Settings } from 'lucide-react-native';
-import { s, ms, msc, clamp } from '@/lib/responsive';
+import { s, msc, clamp } from '@/lib/responsive';
 import { t, resolveLang } from '@/lib/i18n';
 import { usePrefs } from '@/context/PrefsContext';
 

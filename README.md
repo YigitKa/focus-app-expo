@@ -1,99 +1,86 @@
-Retro Focus — Expo App
+Retro Focus - Expo App
+======================
 
-Retro-styled focus timer built with Expo + React Native (Expo Router). It includes a Pomodoro-like timer with selectable presets, a simple task list, a stats screen, and a settings page with persisted preferences and multi-language support (Türkçe / English).
+Retro Focus is a neon-inspired productivity companion built with Expo, React Native, and Expo Router. It combines a flexible Pomodoro-style timer, a lightweight task list, rich productivity analytics, and fully localised settings in English and Turkish. The project demonstrates how to ship a single codebase across mobile and web while keeping the UI responsive and animated.
 
-Features
-- Timer presets: Work, Short Break, Long Break with animated dial and progress.
-- Preset selector on the Timer screen; durations configurable in Settings.
-- Persisted preferences (AsyncStorage): language and timer durations.
-- Language support (auto-detect + manual): Turkish and English.
-- Responsive layout for phones, tablets, and web; clamped sizes to avoid overflow.
-- Bottom tab navigation using Expo Router.
+Table of Contents
+-----------------
+- Overview
+- Feature Highlights
+- Screens at a Glance
+- Architecture Notes
+- State & Persistence
+- Commands & Tooling
+- Deployment (Netlify)
+- Troubleshooting
+- Roadmap / Ideas
 
-Tech Stack
-- Expo SDK 52, React Native 0.76, React 18
-- Expo Router for tabs/routing
-- expo-localization for language detection
-- @react-native-async-storage/async-storage for persisted preferences
+Overview
+--------
+Retro Focus helps you stay engaged during study or work blocks. You can switch between work, short break, and long break presets, monitor how many sessions you have completed, track day streaks and score streaks, and ramp up the challenge with achievement difficulties. All preferences are stored locally, and the UI adapts automatically to portrait or landscape orientations.
 
-Getting Started
-1) Prerequisites
-- Node.js 18+ (LTS recommended)
-- npm 9+ (or your preferred package manager)
+Feature Highlights
+------------------
+- Timer & Animations: Circular countdown with pulse and glow effects, responsive sizing, and instant preset switching.
+- Session Scoreboard: Live totals for each mode, day streak and combo streak tracking, and a running score powered by a difficulty-aware achievement system.
+- Achievements: Configurable difficulty (easy, normal, hard) alters thresholds for milestones such as Focus Starter, Break Champion, Time Keeper, Streak Master, and Combo Breaker.
+- Stats Dashboard: Productivity breakdown, focus vs break distribution, streak history, and progress bars for every achievement.
+- Tasks List: Quick capture, toggle, and delete workflow with indicators for completed vs total tasks.
+- Settings Suite: Language switcher (system/English/Turkce), timer duration controls, audiovisual toggles, difficulty picker, and a guarded "Reset Stats" action.
+- Multi-language Support: English and Turkish strings managed through a simple dictionary in `lib/i18n.ts`.
+- Responsive Layout: Shared responsive helpers (`s`, `vs`, `ms`, `msc`, `clamp`) keep components proportionate on phones, tablets, and the web.
 
-2) Install dependencies
-```
-npm install
-```
+Screens at a Glance
+-------------------
+- Timer (`app/(tabs)/index.tsx`): Heart of the app with presets, countdown, animated dial, progress bar, controls, and the session overview scoreboard. Landscape mode swaps to a compact player layout.
+- Tasks (`app/(tabs)/tasks.tsx`): Manage tasks with inline add, complete, and delete interactions.
+- Stats (`app/(tabs)/stats.tsx`): Visualise productivity through cards, progress bars, and achievement progress adapted to the chosen difficulty.
+- Settings (`app/(tabs)/settings.tsx`): Adjust language, timer durations, interface toggles, achievement difficulty, and reset stored stats.
 
-3) Optional health check
-```
-npx expo-doctor
-```
+Architecture Notes
+------------------
+- Navigation: Expo Router tabs defined in `app/(tabs)/_layout.tsx` (Timer, Tasks, Stats, Settings).
+- Providers: `PrefsContext` stores language and timer durations; `SessionStatsContext` centralises session totals, streaks, score, achievements, difficulty, and reset logic.
+- Styling: Traditional React Native `StyleSheet` plus responsive helper utilities. Linear gradients supply the retro ambience.
+- Icons & Motion: `lucide-react-native` for icons, React Native Animated for pulse and glow loops.
 
-4) Run the app
-```
-npm run dev
-```
-- Press “w” in the terminal to open Web, or run on a device/emulator via Expo DevTools.
+State & Persistence
+-------------------
+- Preferences (`PrefsContext`): Uses `AsyncStorage` to persist language and timer durations across sessions.
+- Session Stats (`SessionStatsContext`): Persists per-mode counts, total focus/break seconds, score, streaks, unlocked achievements, and difficulty. Provides helper methods to record sessions, reset data (with optional difficulty retention), and evaluate achievements.
+- Internationalisation (`lib/i18n.ts`): Minimal dictionary driven by a `Lang` enum; extend the map to add more locales.
 
-5) Build for Web
-```
-npm run build:web
-```
-Output is written to the `dist/` folder.
+Commands & Tooling
+------------------
+- `npm run dev` - Start Expo dev server (press `w` for web, or open on a device/emulator via Expo DevTools).
+- `npm run build:web` - Export the web bundle into `dist/` (used by Netlify deploys).
+- `npm run lint` - Lint via Expo's ESLint preset.
+- `npx expo-doctor` - Optional health check of native dependencies.
 
-Deploying to Netlify
-1) Push your latest changes to GitHub so Netlify can access the repository.
-2) In the Netlify dashboard choose Add new site -> Import an existing project and connect your Git provider.
-3) When prompted for build settings set the build command to `npm run build:web` and the publish directory to `dist`.
-4) Add the environment variables `EXPO_USE_STATIC=1` and `EXPO_NO_TELEMETRY=1` under Settings > Build & deploy > Environment in Netlify.
-5) Trigger a deploy. Netlify will use the generated static bundle in `dist/` and fall back to `index.html` thanks to `netlify.toml`.
-
-
-Scripts
-- `npm run dev` — Start the Expo dev server.
-- `npm run build:web` — Export the app for the Web platform.
-- `npm run lint` — Lint with Expo’s ESLint preset.
-
-Project Structure
-- `app/` — Expo Router directory
-  - `app/_layout.tsx` — Root layout
-  - `app/(tabs)/_layout.tsx` — Tab layout (menu)
-  - `app/(tabs)/index.tsx` — Timer screen (with preset selector)
-  - `app/(tabs)/tasks.tsx` — Task list (add/complete/delete)
-  - `app/(tabs)/stats.tsx` — Stats (sample data / UI)
-  - `app/(tabs)/settings.tsx` — Settings (language + durations, other toggles)
-- `context/PrefsContext.tsx` — Persisted preferences provider (language + durations)
-- `lib/responsive.ts` — Utility helpers (`s`, `vs`, `ms`, `clamp`) for responsive sizing
-- `lib/i18n.ts` — Minimal i18n helper (TR/EN + system detection)
-- `hooks/useFrameworkReady.ts` — Small helper used by root layout
-
-Localization (TR/EN)
-- The app auto-detects device/browser language via `expo-localization`.
-- You can override the language in Settings → LANGUAGE (System / Türkçe / English).
-- To add another language, extend the dictionaries in `lib/i18n.ts` and add it to the `Lang` type.
-
-Timer Presets & Durations
-- On the Timer screen, tap a preset (Work / Short Break / Long Break) to switch modes.
-- Configure the default durations in Settings → TIMER SETTINGS. These values are saved and used by the Timer.
-- Current cycle: Work → Short Break → Work (Long Break can be selected manually). If you want automatic long breaks every N sessions, see the “Ideas / Next” section below.
-
-Known Limitations
-- Stats use sample data and do not persist yet.
-- Sound/vibration/notifications are UI settings only (no runtime wiring yet).
-- Long-break cycling is manual by design in this version.
+Deployment (Netlify)
+--------------------
+1. Push the repository to GitHub (or another supported Git host).
+2. In Netlify, choose **Add new site** -> **Import an existing project** and connect the repo.
+3. Build command: `npm run build:web`
+4. Publish directory: `dist`
+5. Environment variables: `EXPO_USE_STATIC=1`, `EXPO_NO_TELEMETRY=1`
+6. Deploy. The included `netlify.toml` configures the SPA fallback to `index.html`.
 
 Troubleshooting
+---------------
 - Clear Metro cache: `npx expo start -c`
 - Dependency sanity: `npx expo-doctor`
-- If the web UI looks oversized or cramped, ensure you’re not zoomed in the browser and try a hard refresh.
+- Web layout quirks: verify browser zoom is 100%, then hard refresh (Ctrl+Shift+R).
+- Reset stats: Use the button in Settings (keeps difficulty, wipes achievements and session history).
 
-Ideas / Next
-- Wire sound, haptics, and notifications to timer events.
-- Automatic long break after N work sessions (configurable).
-- Persist tasks and stats to storage.
-- Add more languages.
+Roadmap / Ideas
+---------------
+- Wire notification, sound, and haptic toggles to real runtime effects.
+- Automate long breaks (e.g., every 4th work session) with optional reminders.
+- Persist tasks and stats to cloud storage for multi-device sync.
+- Expand localisation beyond English and Turkish.
+- Add share/export options for streak history and achievements.
 
 License
-- No license file included. Add one if you plan to distribute.
+-------
+Retro Focus is distributed under the [Creative Commons Attribution-NonCommercial 4.0 International](LICENSE) license. You may use, remix, and share the project for non-commercial purposes so long as you provide attribution. Contact the authors if you need a commercial license or alternative terms.

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   View,
   Text,
@@ -9,21 +9,67 @@ import {
   ScrollView,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Play, Pause, RotateCcw, Coffee } from 'lucide-react-native';
+import { Play, Pause, RotateCcw } from 'lucide-react-native';
 import { s, vs, ms, clamp, msc } from '@/lib/responsive';
 import { t, resolveLang } from '@/lib/i18n';
 import { usePrefs } from '@/context/PrefsContext';
+import { useSessionStats } from '@/context/SessionStatsContext';
 
 type Mode = 'work' | 'short' | 'long';
 
-export default function TimerScreen() {
+const palette = {
+  primary: '#00FFFF', // Cyan
+  secondary: '#FF00FF', // Magenta
+  accent: '#FFFF00', // Yellow
+  background: '#000011',
+  background2: '#001122',
+  background3: '#000033',
+  text: '#C3C7FF',
+  textEmphasis: '#FFFFFF',
+  border: '#333366',
+  borderActive: '#00FFFF',
+  success: '#00FF66',
+  warning: '#FFA500',
+};
+
+const TimerScreen = () => {
   const { width: winW, height: winH } = useWindowDimensions();
   const { prefs } = usePrefs();
   const uiLang = resolveLang(prefs.language);
-  const [timeLeft, setTimeLeft] = useState(25 * 60); // default; synced below
+  const { stats: sessionStats, recordSession } = useSessionStats();
+  const totals = sessionStats.totals;
+  const totalScore = sessionStats.totalScore;
+  const scoreItems = useMemo(() => [
+    { key: 'work', label: t('timer.score.work', uiLang), value: totals.work.toString() },
+    { key: 'short', label: t('timer.score.short', uiLang), value: totals.short.toString() },
+    { key: 'long', label: t('timer.score.long', uiLang), value: totals.long.toString() },
+    { key: 'streak', label: t('timer.score.streak', uiLang), value: `${sessionStats.currentStreakDays}/${sessionStats.bestStreakDays}` },
+    { key: 'combo', label: t('timer.score.combo', uiLang), value: `${sessionStats.currentScoreStreak}/${sessionStats.bestScoreStreak}` },
+    { key: 'score', label: t('timer.score.total', uiLang), value: totalScore.toString(), emphasis: true },
+  ], [
+    totals.work,
+    totals.short,
+    totals.long,
+    sessionStats.currentStreakDays,
+    sessionStats.bestStreakDays,
+    sessionStats.currentScoreStreak,
+    sessionStats.bestScoreStreak,
+    totalScore,
+    uiLang,
+  ]);
+
+  const workSec = Math.max(1, prefs.workDuration) * 60;
+  const shortSec = Math.max(1, prefs.shortBreakDuration) * 60;
+  const longSec = Math.max(1, prefs.longBreakDuration) * 60;
+  const presetTimes: Record<Mode, number> = {
+    work: workSec,
+    short: shortSec,
+    long: longSec,
+  };
+
+  const [timeLeft, setTimeLeft] = useState(workSec); // default; synced below
   const [isActive, setIsActive] = useState(false);
   const [mode, setMode] = useState<Mode>('work');
-  const [sessions, setSessions] = useState(0);
   const base = Math.min(winW, winH);
   const isLandscape = winW > winH;
   const isPortrait = !isLandscape;
@@ -55,6 +101,9 @@ export default function TimerScreen() {
   const playerContainerGap = vs(usePlayerLayout ? 20 : 16);
   const playerContainerMarginTop = vs(usePlayerLayout ? 24 : 12);
 
+  const total = presetTimes[mode];
+  const progress = ((total - timeLeft) / Math.max(1, total)) * 100;
+
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const glowAnim = useRef(new Animated.Value(0)).current;
 
@@ -62,27 +111,28 @@ export default function TimerScreen() {
     let interval: ReturnType<typeof setInterval> | null = null;
     if (isActive && timeLeft > 0) {
       interval = setInterval(() => setTimeLeft(prev => prev - 1), 1000);
-    } else if (timeLeft === 0) {
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [isActive, timeLeft]);
+
+  useEffect(() => {
+    if (timeLeft === 0) {
+      recordSession(mode, total);
       setIsActive(false);
       if (mode === 'work') {
-        setSessions(s => s + 1);
         setMode('short');
-        setTimeLeft(Math.max(1, prefs.shortBreakDuration) * 60);
       } else {
         setMode('work');
-        setTimeLeft(Math.max(1, prefs.workDuration) * 60);
       }
     }
-    return () => { if (interval) clearInterval(interval); };
-  }, [isActive, timeLeft, mode, prefs.shortBreakDuration, prefs.workDuration]);
+  }, [timeLeft, mode, recordSession, total]);
 
   // Sync timeLeft when mode or preset durations change
   useEffect(() => {
-    const work = Math.max(1, prefs.workDuration) * 60;
-    const shortB = Math.max(1, prefs.shortBreakDuration) * 60;
-    const longB = Math.max(1, prefs.longBreakDuration) * 60;
-    setTimeLeft(mode === 'work' ? work : mode === 'short' ? shortB : longB);
-  }, [prefs.workDuration, prefs.shortBreakDuration, prefs.longBreakDuration, mode]);
+    setTimeLeft(mode === 'work' ? workSec : mode === 'short' ? shortSec : longSec);
+  }, [mode, workSec, shortSec, longSec]);
 
   useEffect(() => {
     if (isActive) {
@@ -119,7 +169,7 @@ export default function TimerScreen() {
       pulseAnim.setValue(1);
       glowAnim.setValue(0);
     }
-  }, [isActive]);
+  }, [glowAnim, isActive, pulseAnim]);
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -135,18 +185,6 @@ export default function TimerScreen() {
     setIsActive(false);
     setMode('work');
     setTimeLeft(Math.max(1, prefs.workDuration) * 60);
-  };
-
-  const workSec = Math.max(1, prefs.workDuration) * 60;
-  const shortSec = Math.max(1, prefs.shortBreakDuration) * 60;
-  const longSec = Math.max(1, prefs.longBreakDuration) * 60;
-  const total = mode === 'work' ? workSec : mode === 'short' ? shortSec : longSec;
-  const progress = ((total - timeLeft) / total) * 100;
-
-  const presetTimes: Record<Mode, number> = {
-    work: workSec,
-    short: shortSec,
-    long: longSec,
   };
 
   const handlePresetPress = (nextMode: Mode) => {
@@ -184,10 +222,42 @@ export default function TimerScreen() {
     </TouchableOpacity>
   ));
 
+  const renderScoreBoard = (variant: 'portrait' | 'landscape') => (
+    <View
+      style={[
+        styles.scoreSection,
+        variant === 'landscape' ? styles.scoreSectionLandscape : styles.scoreSectionPortrait,
+      ]}
+    >
+      {variant === 'portrait' && (
+        <Text style={styles.scoreSectionTitle}>{t('timer.score.title', uiLang)}</Text>
+      )}
+      <View
+        style={[
+          styles.scoreBoard,
+          variant === 'landscape' ? styles.scoreBoardLandscape : styles.scoreBoardPortrait,
+        ]}
+      >
+        {scoreItems.map(item => (
+          <View
+            key={item.key}
+            style={[
+              styles.scoreItem,
+              variant === 'landscape' && styles.scoreItemLandscape,
+              item.emphasis && styles.scoreItemEmphasis,
+            ]}
+          >
+            <Text style={styles.scoreLabel}>{item.label}</Text>
+            <Text style={[styles.scoreValue, { color: item.key === 'work' ? palette.secondary : item.key === 'short' ? palette.primary : item.key === 'long' ? palette.success : item.key === 'streak' ? palette.accent : palette.warning }]}>{item.value}</Text>
+          </View>
+        ))}
+      </View>
+    </View>
+  );
 
   return (
     <LinearGradient
-      colors={['#000011', '#001122', '#000033']}
+      colors={[palette.background, palette.background2, palette.background3]}
       style={[
         styles.container,
         usePlayerLayout ? styles.landscapeContainer : styles.portraitContainer,
@@ -199,7 +269,7 @@ export default function TimerScreen() {
       <View style={[styles.header, isCompact && styles.headerCompact, usePlayerLayout && styles.headerLandscape]}>
         <Text style={[styles.title, { fontSize: titleSize }]}>{t('timer.heading', uiLang)}</Text>
         <Text style={[styles.subtitle, { fontSize: subtitleSize }]}>
-          {mode === 'work' ? t('timer.focus', uiLang) : t('timer.break', uiLang)}
+          {mode === 'work' ? t('timer.focus', uiLang) : t('timer.break', uiLang)} ? {formatTime(timeLeft)}
         </Text>
       </View>
 
@@ -239,10 +309,10 @@ export default function TimerScreen() {
         >
           <View style={[styles.playerCard, styles.playerCardLandscape]}>
             <View style={styles.playerInfo}>
-              <Text style={[styles.playerMode, { color: mode !== 'work' ? '#FFFF00' : '#00FFFF' }]}>
+              <Text style={[styles.playerMode, { color: mode !== 'work' ? palette.accent : palette.primary }]}>
                 {mode === 'work' ? t('timer.focus', uiLang) : t('timer.break', uiLang)}
               </Text>
-              <Text style={[styles.playerTime, { color: mode !== 'work' ? '#FFFF00' : '#FF00FF', fontSize: timeSize }]}>
+              <Text style={[styles.playerTime, { color: mode !== 'work' ? palette.accent : palette.secondary, fontSize: timeSize }]}>
                 {formatTime(timeLeft)}
               </Text>
             </View>
@@ -255,9 +325,9 @@ export default function TimerScreen() {
                 onPress={toggleTimer}
               >
                 {isActive ? (
-                  <Pause size={controlIcon} color="#00FFFF" strokeWidth={2} />
+                  <Pause size={controlIcon} color={palette.primary} strokeWidth={2} />
                 ) : (
-                  <Play size={controlIcon} color="#00FFFF" strokeWidth={2} />
+                  <Play size={controlIcon} color={palette.primary} strokeWidth={2} />
                 )}
               </TouchableOpacity>
 
@@ -268,7 +338,7 @@ export default function TimerScreen() {
                 ]}
                 onPress={resetTimer}
               >
-                <RotateCcw size={controlIcon} color="#00FFFF" strokeWidth={2} />
+                <RotateCcw size={controlIcon} color={palette.primary} strokeWidth={2} />
               </TouchableOpacity>
             </View>
           </View>
@@ -280,18 +350,14 @@ export default function TimerScreen() {
                   styles.playerProgressFill,
                   {
                     width: `${progress}%`,
-                    backgroundColor: mode !== 'work' ? '#FFFF00' : '#FF00FF',
+                    backgroundColor: mode !== 'work' ? palette.accent : palette.secondary,
                   },
                 ]}
               />
             </View>
           </View>
 
-          <View style={[styles.playerStatsRow, styles.playerStatsRowLandscape]}>
-            <Coffee size={24} color="#FFFF00" strokeWidth={2} />
-            <Text style={styles.playerStatsLabel}>{t('label.sessions', uiLang)}</Text>
-            <Text style={styles.playerStatsValue}>{sessions}</Text>
-          </View>
+          {renderScoreBoard('landscape')}
         </View>
       ) : (
         <View style={styles.timerSection}>
@@ -303,12 +369,12 @@ export default function TimerScreen() {
                 height: circleSize,
                 borderRadius: circleSize / 2,
                 transform: [{ scale: pulseAnim }],
-                shadowColor: mode !== 'work' ? '#FFFF00' : '#FF00FF',
+                shadowColor: mode !== 'work' ? palette.accent : palette.secondary,
                 shadowOpacity: glowAnim,
               }
             ]}
           >
-            <Text style={[styles.timeText, { color: mode !== 'work' ? '#FFFF00' : '#FF00FF', fontSize: timeSize }]}>
+            <Text style={[styles.timeText, { color: mode !== 'work' ? palette.accent : palette.secondary, fontSize: timeSize }]}>
               {formatTime(timeLeft)}
             </Text>
           </Animated.View>
@@ -320,7 +386,7 @@ export default function TimerScreen() {
                   styles.progressFill,
                   { 
                     width: `${progress}%`,
-                    backgroundColor: mode !== 'work' ? '#FFFF00' : '#FF00FF',
+                    backgroundColor: mode !== 'work' ? palette.accent : palette.secondary,
                   }
                 ]} 
               />
@@ -330,30 +396,26 @@ export default function TimerScreen() {
           <View style={styles.controlButtons}>
             <TouchableOpacity style={[styles.controlButton, { width: buttonSize, height: buttonSize, borderRadius: buttonSize / 2 }]} onPress={toggleTimer}>
               {isActive ? (
-                <Pause size={controlIcon} color="#00FFFF" strokeWidth={2} />
+                <Pause size={controlIcon} color={palette.primary} strokeWidth={2} />
               ) : (
-                <Play size={controlIcon} color="#00FFFF" strokeWidth={2} />
+                <Play size={controlIcon} color={palette.primary} strokeWidth={2} />
               )}
             </TouchableOpacity>
 
             <TouchableOpacity style={[styles.controlButton, { width: buttonSize, height: buttonSize, borderRadius: buttonSize / 2 }]} onPress={resetTimer}>
-              <RotateCcw size={controlIcon} color="#00FFFF" strokeWidth={2} />
+              <RotateCcw size={controlIcon} color={palette.primary} strokeWidth={2} />
             </TouchableOpacity>
           </View>
 
-          <View style={styles.statsRow}>
-            <View style={styles.statItem}>
-              <Coffee size={24} color="#FFFF00" strokeWidth={2} />
-              <Text style={styles.statText}>{t('label.sessions', uiLang)}</Text>
-              <Text style={styles.statNumber}>{sessions}</Text>
-            </View>
-          </View>
+          {renderScoreBoard('portrait')}
         </View>
       )}
 
     </LinearGradient>
   );
 }
+
+export default TimerScreen;
 
 const styles = StyleSheet.create({
   container: {
@@ -409,40 +471,46 @@ const styles = StyleSheet.create({
     paddingHorizontal: s(12),
     paddingVertical: s(8),
     borderWidth: 1,
-    borderColor: '#333366',
+    borderColor: palette.border,
     borderRadius: 16,
     backgroundColor: 'rgba(255,255,255,0.08)',
     alignItems: 'center',
     justifyContent: 'center',
   },
+  presetButtonCompact: {
+    paddingVertical: s(6),
+  },
   presetActive: {
-    borderColor: '#00FFFF',
+    borderColor: palette.borderActive,
     backgroundColor: 'rgba(0,255,255,0.12)',
   },
   presetText: {
-    fontFamily: 'Courier New',
+    fontFamily: 'monospace',
     fontSize: ms(10),
-    color: '#C3C7FF',
+    color: palette.text,
     letterSpacing: 1,
     textAlign: 'center',
   },
+  presetTextCompact: {
+    fontSize: ms(9),
+  },
   presetTextActive: {
-    color: '#00FFFF',
+    color: palette.primary,
     fontWeight: '700',
   },
   title: {
-    fontFamily: 'Courier New',
+    fontFamily: 'monospace',
     fontSize: ms(28),
     fontWeight: 'bold',
-    color: '#00FFFF',
+    color: palette.primary,
     letterSpacing: 4,
-    textShadowColor: '#00FFFF',
+    textShadowColor: palette.primary,
     textShadowRadius: 10,
   },
   subtitle: {
-    fontFamily: 'Courier New',
+    fontFamily: 'monospace',
     fontSize: ms(14),
-    color: '#FF00FF',
+    color: palette.secondary,
     letterSpacing: 2,
     marginTop: 8,
   },
@@ -455,7 +523,7 @@ const styles = StyleSheet.create({
   },
   timerCircle: {
     borderWidth: 4,
-    borderColor: '#FF00FF',
+    borderColor: palette.secondary,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'rgba(255,0,255,0.05)',
@@ -464,7 +532,7 @@ const styles = StyleSheet.create({
     elevation: s(6),
   },
   timeText: {
-    fontFamily: 'Courier New',
+    fontFamily: 'monospace',
     fontSize: ms(40),
     fontWeight: 'bold',
     letterSpacing: 2,
@@ -477,7 +545,7 @@ const styles = StyleSheet.create({
   progressBar: {
     width: '80%',
     height: s(8),
-    backgroundColor: '#333366',
+    backgroundColor: palette.border,
     borderRadius: 4,
     overflow: 'hidden',
   },
@@ -496,7 +564,7 @@ const styles = StyleSheet.create({
     borderRadius: s(32),
     backgroundColor: 'rgba(0,255,255,0.1)',
     borderWidth: 2,
-    borderColor: '#00FFFF',
+    borderColor: palette.primary,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -527,13 +595,13 @@ const styles = StyleSheet.create({
     gap: vs(6),
   },
   playerMode: {
-    fontFamily: 'Courier New',
+    fontFamily: 'monospace',
     fontSize: ms(12),
     letterSpacing: 2,
-    color: '#C3C7FF',
+    color: palette.text,
   },
   playerTime: {
-    fontFamily: 'Courier New',
+    fontFamily: 'monospace',
     fontSize: ms(32),
     fontWeight: '700',
     letterSpacing: 2,
@@ -550,7 +618,7 @@ const styles = StyleSheet.create({
   },
   playerControlButton: {
     borderWidth: 2,
-    borderColor: '#00FFFF',
+    borderColor: palette.primary,
     backgroundColor: 'rgba(0,255,255,0.12)',
     alignItems: 'center',
     justifyContent: 'center',
@@ -565,7 +633,7 @@ const styles = StyleSheet.create({
   playerProgressBar: {
     width: '100%',
     height: s(8),
-    backgroundColor: '#333366',
+    backgroundColor: palette.border,
     borderRadius: 4,
     overflow: 'hidden',
   },
@@ -573,48 +641,69 @@ const styles = StyleSheet.create({
     height: '100%',
     borderRadius: 4,
   },
-  playerStatsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: s(10),
-    marginTop: vs(8),
+  scoreSection: {
+    width: '100%',
+    alignItems: 'stretch',
+    marginTop: vs(24),
   },
-  playerStatsRowLandscape: {
-    justifyContent: 'flex-end',
+  scoreSectionPortrait: {
+    paddingHorizontal: s(12),
+  },
+  scoreSectionLandscape: {
+    marginTop: vs(16),
+  },
+  scoreSectionTitle: {
+    fontFamily: 'monospace',
+    fontSize: ms(12),
+    color: palette.primary,
+    letterSpacing: 2,
+    marginBottom: vs(12),
+    textAlign: 'center',
+  },
+  scoreBoard: {
+    width: '100%',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
     gap: s(12),
   },
-  playerStatsLabel: {
-    fontFamily: 'Courier New',
+  scoreBoardPortrait: {
+    justifyContent: 'space-between',
+  },
+  scoreBoardLandscape: {
+    justifyContent: 'space-between',
+  },
+  scoreItem: {
+    flexGrow: 1,
+    flexBasis: '48%',
+    minWidth: s(120),
+    borderWidth: 1,
+    borderColor: 'rgba(0,255,255,0.3)',
+    backgroundColor: 'rgba(0,0,50,0.35)',
+    borderRadius: 12,
+    paddingVertical: vs(10),
+    paddingHorizontal: s(10),
+    alignItems: 'center',
+    gap: vs(6),
+  },
+  scoreItemLandscape: {
+    flexBasis: '22%',
+    maxWidth: '24%',
+  },
+  scoreItemEmphasis: {
+    borderColor: palette.accent,
+    backgroundColor: 'rgba(255,255,0,0.12)',
+  },
+  scoreLabel: {
+    fontFamily: 'monospace',
     fontSize: ms(11),
-    color: '#C3C7FF',
+    color: palette.text,
     letterSpacing: 1,
   },
-  playerStatsValue: {
-    fontFamily: 'Courier New',
-    fontSize: ms(18),
+  scoreValue: {
+    fontFamily: 'monospace',
+    fontSize: ms(20),
     fontWeight: '700',
-    color: '#FFFF00',
-  },
-  statsRow: {
-    marginTop: vs(24),
-    alignItems: 'center',
-  },
-  statItem: {
-    alignItems: 'center',
-    gap: s(8),
-  },
-  statText: {
-    fontFamily: 'Courier New',
-    fontSize: ms(12),
-    color: '#666699',
     letterSpacing: 1,
-  },
-  statNumber: {
-    fontFamily: 'Courier New',
-    fontSize: ms(22),
-    fontWeight: 'bold',
-    color: '#FFFF00',
   },
 });
-
