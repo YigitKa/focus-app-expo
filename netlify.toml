@@ -1,0 +1,12 @@
+[build]
+  command = "npm run build:web"
+  publish = "dist"
+
+[build.environment]
+  EXPO_USE_STATIC = "1"
+  EXPO_NO_TELEMETRY = "1"
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

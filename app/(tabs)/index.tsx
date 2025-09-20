@@ -26,15 +26,35 @@ export default function TimerScreen() {
   const [sessions, setSessions] = useState(0);
   const base = Math.min(winW, winH);
   const isLandscape = winW > winH;
-  const isCompact = isLandscape ? winH < 540 || winW < 640 : winW < 420;
-  const circleSize = clamp(base * (isCompact ? 0.42 : 0.5), isCompact ? 150 : 220, isCompact ? 260 : 360);
-  const controlIcon = isCompact ? msc(22, 18, 26) : msc(26, 20, 30);
-  const buttonSize = isCompact ? clamp(s(52), 48, 68) : clamp(s(64), 56, 84);
-  const titleSize = isCompact ? msc(22, 16, 26) : msc(28, 18, 30);
-  const subtitleSize = isCompact ? msc(12, 10, 16) : msc(14, 12, 18);
-  const timeSize = isCompact ? msc(32, 24, 40) : msc(40, 28, 48);
-  const presetWidth = clamp(base * (isCompact ? 0.38 : 0.24), isCompact ? 96 : 92, isCompact ? 132 : 148);
-    
+  const isPortrait = !isLandscape;
+  const isCompact = isPortrait ? winW < 420 : winH < 540 || winW < 640;
+  const usePlayerLayout = isLandscape;
+  const circleSize = clamp(
+    base * (isCompact && isPortrait ? 0.42 : 0.5),
+    isCompact && isPortrait ? 150 : 220,
+    isCompact && isPortrait ? 260 : 360
+  );
+  const controlIcon = usePlayerLayout ? msc(28, 22, 34) : isCompact ? msc(22, 18, 26) : msc(26, 20, 30);
+  const buttonSize = isCompact || usePlayerLayout ? clamp(s(56), 50, 80) : clamp(s(64), 56, 84);
+  const titleSize = usePlayerLayout ? msc(24, 18, 30) : isCompact ? msc(22, 16, 26) : msc(28, 18, 30);
+  const subtitleSize = usePlayerLayout ? msc(13, 11, 18) : isCompact ? msc(12, 10, 16) : msc(14, 12, 18);
+  const timeSize = usePlayerLayout ? msc(34, 26, 44) : isCompact ? msc(32, 24, 40) : msc(40, 28, 48);
+  const presetWidth = usePlayerLayout
+    ? clamp(base * 0.28, 120, 200)
+    : clamp(base * (isCompact ? 0.38 : 0.24), isCompact ? 96 : 92, isCompact ? 132 : 148);
+  const presetSpacing = usePlayerLayout
+    ? clamp(base * 0.14, vs(18), vs(36))
+    : clamp(circleSize * 0.18, vs(18), vs(isCompact ? 48 : 60));
+  const playerMaxWidth = clamp(
+    winW * (usePlayerLayout ? 0.6 : 0.9),
+    usePlayerLayout ? 420 : 320,
+    usePlayerLayout ? 880 : 560
+  );
+  const playerButtonSize = clamp(s(usePlayerLayout ? 56 : 48), usePlayerLayout ? 52 : 44, usePlayerLayout ? 74 : 60);
+  const useScrollPresets = !usePlayerLayout && isCompact;
+  const playerContainerGap = vs(usePlayerLayout ? 20 : 16);
+  const playerContainerMarginTop = vs(usePlayerLayout ? 24 : 12);
+
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const glowAnim = useRef(new Animated.Value(0)).current;
 
@@ -166,43 +186,74 @@ export default function TimerScreen() {
 
 
   return (
-    <LinearGradient colors={['#000011', '#001122', '#000033']} style={[styles.container, isCompact && styles.compactContainer]}>
+    <LinearGradient
+      colors={['#000011', '#001122', '#000033']}
+      style={[
+        styles.container,
+        usePlayerLayout ? styles.landscapeContainer : styles.portraitContainer,
+        !usePlayerLayout && isCompact && styles.compactContainer,
+      ]}
+    >
       <View style={styles.gridOverlay} />
       
-      <View style={[styles.header, isCompact && styles.headerCompact]}>
+      <View style={[styles.header, isCompact && styles.headerCompact, usePlayerLayout && styles.headerLandscape]}>
         <Text style={[styles.title, { fontSize: titleSize }]}>{t('timer.heading', uiLang)}</Text>
         <Text style={[styles.subtitle, { fontSize: subtitleSize }]}>
           {mode === 'work' ? t('timer.focus', uiLang) : t('timer.break', uiLang)}
         </Text>
       </View>
 
-      {isCompact ? (
+      {useScrollPresets ? (
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.presetScrollContent}
+          contentContainerStyle={[styles.presetScrollContent, { paddingBottom: presetSpacing }]}
         >
           {presetButtons}
         </ScrollView>
       ) : (
-        <View style={styles.presetRow}>
+        <View
+          style={[
+            styles.presetRow,
+            usePlayerLayout && { width: '100%', maxWidth: playerMaxWidth },
+            { marginBottom: presetSpacing },
+          ]}
+        >
           {presetButtons}
         </View>
       )}
 
-      {isCompact ? (
-        <View style={styles.playerContainer}>
-          <View style={styles.playerCard}>
+      {usePlayerLayout ? (
+        <View
+          style={[
+            styles.playerContainer,
+            {
+              alignSelf: 'center',
+              width: '100%',
+              flexGrow: 1,
+              maxWidth: playerMaxWidth,
+              marginTop: playerContainerMarginTop,
+              gap: playerContainerGap,
+            },
+          ]}
+        >
+          <View style={[styles.playerCard, styles.playerCardLandscape]}>
             <View style={styles.playerInfo}>
               <Text style={[styles.playerMode, { color: mode !== 'work' ? '#FFFF00' : '#00FFFF' }]}>
                 {mode === 'work' ? t('timer.focus', uiLang) : t('timer.break', uiLang)}
               </Text>
-              <Text style={[styles.playerTime, { color: mode !== 'work' ? '#FFFF00' : '#FF00FF' }]}>
+              <Text style={[styles.playerTime, { color: mode !== 'work' ? '#FFFF00' : '#FF00FF', fontSize: timeSize }]}>
                 {formatTime(timeLeft)}
               </Text>
             </View>
-            <View style={styles.playerControlsRow}>
-              <TouchableOpacity style={styles.playerControlButton} onPress={toggleTimer}>
+            <View style={[styles.playerControlsRow, styles.playerControlsRowLandscape]}>
+              <TouchableOpacity
+                style={[
+                  styles.playerControlButton,
+                  { width: playerButtonSize, height: playerButtonSize, borderRadius: playerButtonSize / 2 },
+                ]}
+                onPress={toggleTimer}
+              >
                 {isActive ? (
                   <Pause size={controlIcon} color="#00FFFF" strokeWidth={2} />
                 ) : (
@@ -210,13 +261,19 @@ export default function TimerScreen() {
                 )}
               </TouchableOpacity>
 
-              <TouchableOpacity style={styles.playerControlButton} onPress={resetTimer}>
+              <TouchableOpacity
+                style={[
+                  styles.playerControlButton,
+                  { width: playerButtonSize, height: playerButtonSize, borderRadius: playerButtonSize / 2 },
+                ]}
+                onPress={resetTimer}
+              >
                 <RotateCcw size={controlIcon} color="#00FFFF" strokeWidth={2} />
               </TouchableOpacity>
             </View>
           </View>
 
-          <View style={styles.playerProgressSection}>
+          <View style={[styles.playerProgressSection, styles.playerProgressSectionLandscape]}>
             <View style={styles.playerProgressBar}>
               <Animated.View
                 style={[
@@ -230,8 +287,8 @@ export default function TimerScreen() {
             </View>
           </View>
 
-          <View style={styles.playerStatsRow}>
-            <Coffee size={20} color="#FFFF00" strokeWidth={2} />
+          <View style={[styles.playerStatsRow, styles.playerStatsRowLandscape]}>
+            <Coffee size={24} color="#FFFF00" strokeWidth={2} />
             <Text style={styles.playerStatsLabel}>{t('label.sessions', uiLang)}</Text>
             <Text style={styles.playerStatsValue}>{sessions}</Text>
           </View>
@@ -301,12 +358,19 @@ export default function TimerScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  portraitContainer: {
+    paddingHorizontal: s(16),
     paddingTop: vs(24),
     paddingBottom: vs(24),
   },
   compactContainer: {
     paddingTop: vs(16),
     paddingBottom: vs(16),
+  },
+  landscapeContainer: {
+    paddingHorizontal: s(28),
+    paddingVertical: vs(18),
   },
   gridOverlay: {
     position: 'absolute',
@@ -322,12 +386,21 @@ const styles = StyleSheet.create({
   headerCompact: {
     paddingVertical: vs(10),
   },
+  headerLandscape: {
+    paddingVertical: vs(12),
+  },
+  presetScrollContent: {
+    paddingHorizontal: s(12),
+    gap: s(8),
+    columnGap: s(8),
+    alignItems: 'center',
+  },
   presetRow: {
     flexDirection: 'row',
     justifyContent: 'center',
+    flexWrap: 'wrap',
     gap: s(8),
     marginTop: vs(10),
-    marginBottom: vs(12),
     paddingHorizontal: s(12),
     alignSelf: 'center',
     zIndex: 2,
@@ -379,7 +452,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: s(24),
     paddingTop: vs(12),
-    marginTop: vs(24),
   },
   timerCircle: {
     borderWidth: 4,
@@ -431,13 +503,12 @@ const styles = StyleSheet.create({
   playerContainer: {
     width: '100%',
     paddingHorizontal: s(16),
-    marginTop: vs(12),
-    gap: vs(16),
   },
   playerCard: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    flexWrap: 'wrap',
     paddingHorizontal: s(16),
     paddingVertical: s(14),
     borderRadius: 20,
@@ -445,6 +516,11 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(0,255,255,0.35)',
     backgroundColor: 'rgba(0,0,50,0.35)',
     gap: s(16),
+  },
+  playerCardLandscape: {
+    paddingHorizontal: s(24),
+    paddingVertical: s(18),
+    gap: s(20),
   },
   playerInfo: {
     flex: 1,
@@ -464,12 +540,15 @@ const styles = StyleSheet.create({
   },
   playerControlsRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
     gap: s(12),
   },
+  playerControlsRowLandscape: {
+    justifyContent: 'flex-end',
+    gap: s(16),
+  },
   playerControlButton: {
-    width: s(48),
-    height: s(48),
-    borderRadius: s(24),
     borderWidth: 2,
     borderColor: '#00FFFF',
     backgroundColor: 'rgba(0,255,255,0.12)',
@@ -479,6 +558,9 @@ const styles = StyleSheet.create({
   playerProgressSection: {
     width: '100%',
     paddingHorizontal: s(4),
+  },
+  playerProgressSectionLandscape: {
+    paddingHorizontal: s(12),
   },
   playerProgressBar: {
     width: '100%',
@@ -496,6 +578,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: s(10),
+    marginTop: vs(8),
+  },
+  playerStatsRowLandscape: {
+    justifyContent: 'flex-end',
+    gap: s(12),
   },
   playerStatsLabel: {
     fontFamily: 'Courier New',

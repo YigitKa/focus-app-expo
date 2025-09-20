@@ -43,6 +43,14 @@ npm run build:web
 ```
 Output is written to the `dist/` folder.
 
+Deploying to Netlify
+1) Push your latest changes to GitHub so Netlify can access the repository.
+2) In the Netlify dashboard choose Add new site -> Import an existing project and connect your Git provider.
+3) When prompted for build settings set the build command to `npm run build:web` and the publish directory to `dist`.
+4) Add the environment variables `EXPO_USE_STATIC=1` and `EXPO_NO_TELEMETRY=1` under Settings > Build & deploy > Environment in Netlify.
+5) Trigger a deploy. Netlify will use the generated static bundle in `dist/` and fall back to `index.html` thanks to `netlify.toml`.
+
+
 Scripts
 - `npm run dev` — Start the Expo dev server.
 - `npm run build:web` — Export the app for the Web platform.
