@@ -1,0 +1,24 @@
+{
+  "short_name": "RetroOdak",
+  "name": "Retro Odak",
+  "description": "Retro tarzi odaklanma sayaci",
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "type": "image/png",
+      "sizes": "192x192"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "type": "image/png",
+      "sizes": "512x512"
+    }
+  ],
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "background_color": "#05051a",
+  "theme_color": "#080830",
+  "orientation": "portrait",
+  "lang": "tr"
+}

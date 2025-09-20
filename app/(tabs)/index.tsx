@@ -6,6 +6,7 @@ import {
   StyleSheet,
   useWindowDimensions,
   Animated,
+  ScrollView,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Play, Pause, RotateCcw, Coffee } from 'lucide-react-native';
@@ -24,13 +25,16 @@ export default function TimerScreen() {
   const [mode, setMode] = useState<Mode>('work');
   const [sessions, setSessions] = useState(0);
   const base = Math.min(winW, winH);
-  const circleSize = clamp(base * 0.5, 220, 360);
-  const controlIcon = msc(26, 20, 30);
-  const buttonSize = clamp(s(64), 56, 84);
-  const titleSize = msc(28, 18, 30);
-  const subtitleSize = msc(14, 12, 18);
-  const timeSize = msc(40, 28, 48);
-  
+  const isLandscape = winW > winH;
+  const isCompact = isLandscape ? winH < 540 || winW < 640 : winW < 420;
+  const circleSize = clamp(base * (isCompact ? 0.42 : 0.5), isCompact ? 150 : 220, isCompact ? 260 : 360);
+  const controlIcon = isCompact ? msc(22, 18, 26) : msc(26, 20, 30);
+  const buttonSize = isCompact ? clamp(s(52), 48, 68) : clamp(s(64), 56, 84);
+  const titleSize = isCompact ? msc(22, 16, 26) : msc(28, 18, 30);
+  const subtitleSize = isCompact ? msc(12, 10, 16) : msc(14, 12, 18);
+  const timeSize = isCompact ? msc(32, 24, 40) : msc(40, 28, 48);
+  const presetWidth = clamp(base * (isCompact ? 0.38 : 0.24), isCompact ? 96 : 92, isCompact ? 132 : 148);
+    
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const glowAnim = useRef(new Animated.Value(0)).current;
 
@@ -119,99 +123,177 @@ export default function TimerScreen() {
   const total = mode === 'work' ? workSec : mode === 'short' ? shortSec : longSec;
   const progress = ((total - timeLeft) / total) * 100;
 
+  const presetTimes: Record<Mode, number> = {
+    work: workSec,
+    short: shortSec,
+    long: longSec,
+  };
+
+  const handlePresetPress = (nextMode: Mode) => {
+    setMode(nextMode);
+    setIsActive(false);
+    setTimeLeft(presetTimes[nextMode]);
+  };
+
+  const presetOptions: { key: Mode; label: string }[] = [
+    { key: 'work', label: t('settings.work', uiLang) },
+    { key: 'short', label: t('settings.shortBreak', uiLang) },
+    { key: 'long', label: t('settings.longBreak', uiLang) },
+  ];
+
+  const presetButtons = presetOptions.map(({ key, label }) => (
+    <TouchableOpacity
+      key={key}
+      onPress={() => handlePresetPress(key)}
+      style={[
+        styles.presetButton,
+        { width: presetWidth },
+        isCompact && styles.presetButtonCompact,
+        mode === key && styles.presetActive,
+      ]}
+    >
+      <Text
+        style={[
+          styles.presetText,
+          isCompact && styles.presetTextCompact,
+          mode === key && styles.presetTextActive,
+        ]}
+      >
+        {label}
+      </Text>
+    </TouchableOpacity>
+  ));
+
+
   return (
-    <LinearGradient colors={['#000011', '#001122', '#000033']} style={styles.container}>
+    <LinearGradient colors={['#000011', '#001122', '#000033']} style={[styles.container, isCompact && styles.compactContainer]}>
       <View style={styles.gridOverlay} />
       
-      <View style={styles.header}>
+      <View style={[styles.header, isCompact && styles.headerCompact]}>
         <Text style={[styles.title, { fontSize: titleSize }]}>{t('timer.heading', uiLang)}</Text>
         <Text style={[styles.subtitle, { fontSize: subtitleSize }]}>
           {mode === 'work' ? t('timer.focus', uiLang) : t('timer.break', uiLang)}
         </Text>
       </View>
 
-      <View style={styles.presetRow}>
-        <TouchableOpacity
-          onPress={() => { setMode('work'); setIsActive(false); setTimeLeft(workSec); }}
-          style={[styles.presetButton, mode === 'work' && styles.presetActive]}
+      {isCompact ? (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.presetScrollContent}
         >
-          <Text style={[styles.presetText, mode === 'work' && styles.presetTextActive]}>
-            {t('settings.work', uiLang)}
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          onPress={() => { setMode('short'); setIsActive(false); setTimeLeft(shortSec); }}
-          style={[styles.presetButton, mode === 'short' && styles.presetActive]}
-        >
-          <Text style={[styles.presetText, mode === 'short' && styles.presetTextActive]}>
-            {t('settings.shortBreak', uiLang)}
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          onPress={() => { setMode('long'); setIsActive(false); setTimeLeft(longSec); }}
-          style={[styles.presetButton, mode === 'long' && styles.presetActive]}
-        >
-          <Text style={[styles.presetText, mode === 'long' && styles.presetTextActive]}>
-            {t('settings.longBreak', uiLang)}
-          </Text>
-        </TouchableOpacity>
-      </View>
+          {presetButtons}
+        </ScrollView>
+      ) : (
+        <View style={styles.presetRow}>
+          {presetButtons}
+        </View>
+      )}
 
-      <View style={styles.timerSection}>
-        <Animated.View 
-          style={[
-            styles.timerCircle,
-            {
-              width: circleSize,
-              height: circleSize,
-              borderRadius: circleSize / 2,
-              transform: [{ scale: pulseAnim }],
-              shadowColor: mode !== 'work' ? '#FFFF00' : '#FF00FF',
-              shadowOpacity: glowAnim,
-            }
-          ]}
-        >
-          <Text style={[styles.timeText, { color: mode !== 'work' ? '#FFFF00' : '#FF00FF', fontSize: timeSize }]}>
-            {formatTime(timeLeft)}
-          </Text>
-        </Animated.View>
+      {isCompact ? (
+        <View style={styles.playerContainer}>
+          <View style={styles.playerCard}>
+            <View style={styles.playerInfo}>
+              <Text style={[styles.playerMode, { color: mode !== 'work' ? '#FFFF00' : '#00FFFF' }]}>
+                {mode === 'work' ? t('timer.focus', uiLang) : t('timer.break', uiLang)}
+              </Text>
+              <Text style={[styles.playerTime, { color: mode !== 'work' ? '#FFFF00' : '#FF00FF' }]}>
+                {formatTime(timeLeft)}
+              </Text>
+            </View>
+            <View style={styles.playerControlsRow}>
+              <TouchableOpacity style={styles.playerControlButton} onPress={toggleTimer}>
+                {isActive ? (
+                  <Pause size={controlIcon} color="#00FFFF" strokeWidth={2} />
+                ) : (
+                  <Play size={controlIcon} color="#00FFFF" strokeWidth={2} />
+                )}
+              </TouchableOpacity>
 
-        <View style={styles.progressContainer}>
-          <View style={styles.progressBar}>
-            <Animated.View 
-              style={[
-                styles.progressFill,
-                { 
-                  width: `${progress}%`,
-                  backgroundColor: mode !== 'work' ? '#FFFF00' : '#FF00FF',
-                }
-              ]} 
-            />
+              <TouchableOpacity style={styles.playerControlButton} onPress={resetTimer}>
+                <RotateCcw size={controlIcon} color="#00FFFF" strokeWidth={2} />
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          <View style={styles.playerProgressSection}>
+            <View style={styles.playerProgressBar}>
+              <Animated.View
+                style={[
+                  styles.playerProgressFill,
+                  {
+                    width: `${progress}%`,
+                    backgroundColor: mode !== 'work' ? '#FFFF00' : '#FF00FF',
+                  },
+                ]}
+              />
+            </View>
+          </View>
+
+          <View style={styles.playerStatsRow}>
+            <Coffee size={20} color="#FFFF00" strokeWidth={2} />
+            <Text style={styles.playerStatsLabel}>{t('label.sessions', uiLang)}</Text>
+            <Text style={styles.playerStatsValue}>{sessions}</Text>
           </View>
         </View>
+      ) : (
+        <View style={styles.timerSection}>
+          <Animated.View 
+            style={[
+              styles.timerCircle,
+              {
+                width: circleSize,
+                height: circleSize,
+                borderRadius: circleSize / 2,
+                transform: [{ scale: pulseAnim }],
+                shadowColor: mode !== 'work' ? '#FFFF00' : '#FF00FF',
+                shadowOpacity: glowAnim,
+              }
+            ]}
+          >
+            <Text style={[styles.timeText, { color: mode !== 'work' ? '#FFFF00' : '#FF00FF', fontSize: timeSize }]}>
+              {formatTime(timeLeft)}
+            </Text>
+          </Animated.View>
 
-        <View style={styles.controlButtons}>
-          <TouchableOpacity style={[styles.controlButton, { width: buttonSize, height: buttonSize, borderRadius: buttonSize / 2 }]} onPress={toggleTimer}>
-            {isActive ? (
-              <Pause size={controlIcon} color="#00FFFF" strokeWidth={2} />
-            ) : (
-              <Play size={controlIcon} color="#00FFFF" strokeWidth={2} />
-            )}
-          </TouchableOpacity>
+          <View style={styles.progressContainer}>
+            <View style={styles.progressBar}>
+              <Animated.View 
+                style={[
+                  styles.progressFill,
+                  { 
+                    width: `${progress}%`,
+                    backgroundColor: mode !== 'work' ? '#FFFF00' : '#FF00FF',
+                  }
+                ]} 
+              />
+            </View>
+          </View>
 
-          <TouchableOpacity style={[styles.controlButton, { width: buttonSize, height: buttonSize, borderRadius: buttonSize / 2 }]} onPress={resetTimer}>
-            <RotateCcw size={controlIcon} color="#00FFFF" strokeWidth={2} />
-          </TouchableOpacity>
-        </View>
+          <View style={styles.controlButtons}>
+            <TouchableOpacity style={[styles.controlButton, { width: buttonSize, height: buttonSize, borderRadius: buttonSize / 2 }]} onPress={toggleTimer}>
+              {isActive ? (
+                <Pause size={controlIcon} color="#00FFFF" strokeWidth={2} />
+              ) : (
+                <Play size={controlIcon} color="#00FFFF" strokeWidth={2} />
+              )}
+            </TouchableOpacity>
 
-        <View style={styles.statsRow}>
-          <View style={styles.statItem}>
-            <Coffee size={24} color="#FFFF00" strokeWidth={2} />
-            <Text style={styles.statText}>{t('label.sessions', uiLang)}</Text>
-            <Text style={styles.statNumber}>{sessions}</Text>
+            <TouchableOpacity style={[styles.controlButton, { width: buttonSize, height: buttonSize, borderRadius: buttonSize / 2 }]} onPress={resetTimer}>
+              <RotateCcw size={controlIcon} color="#00FFFF" strokeWidth={2} />
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.statsRow}>
+            <View style={styles.statItem}>
+              <Coffee size={24} color="#FFFF00" strokeWidth={2} />
+              <Text style={styles.statText}>{t('label.sessions', uiLang)}</Text>
+              <Text style={styles.statNumber}>{sessions}</Text>
+            </View>
           </View>
         </View>
-      </View>
+      )}
+
     </LinearGradient>
   );
 }
@@ -221,6 +303,10 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingTop: vs(24),
     paddingBottom: vs(24),
+  },
+  compactContainer: {
+    paddingTop: vs(16),
+    paddingBottom: vs(16),
   },
   gridOverlay: {
     position: 'absolute',
@@ -233,19 +319,28 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: vs(16),
   },
+  headerCompact: {
+    paddingVertical: vs(10),
+  },
   presetRow: {
     flexDirection: 'row',
     justifyContent: 'center',
     gap: s(8),
-    marginTop: vs(8),
+    marginTop: vs(10),
+    marginBottom: vs(12),
+    paddingHorizontal: s(12),
+    alignSelf: 'center',
+    zIndex: 2,
   },
   presetButton: {
-    paddingHorizontal: s(10),
-    paddingVertical: s(6),
+    paddingHorizontal: s(12),
+    paddingVertical: s(8),
     borderWidth: 1,
     borderColor: '#333366',
     borderRadius: 16,
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   presetActive: {
     borderColor: '#00FFFF',
@@ -254,12 +349,13 @@ const styles = StyleSheet.create({
   presetText: {
     fontFamily: 'Courier New',
     fontSize: ms(10),
-    color: '#888899',
+    color: '#C3C7FF',
     letterSpacing: 1,
+    textAlign: 'center',
   },
   presetTextActive: {
     color: '#00FFFF',
-    fontWeight: 'bold',
+    fontWeight: '700',
   },
   title: {
     fontFamily: 'Courier New',
@@ -282,6 +378,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: s(24),
+    paddingTop: vs(12),
+    marginTop: vs(24),
   },
   timerCircle: {
     borderWidth: 4,
@@ -289,6 +387,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'rgba(255,0,255,0.05)',
+    marginTop: vs(6),
     shadowRadius: s(20),
     elevation: s(6),
   },
@@ -329,6 +428,87 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  playerContainer: {
+    width: '100%',
+    paddingHorizontal: s(16),
+    marginTop: vs(12),
+    gap: vs(16),
+  },
+  playerCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: s(16),
+    paddingVertical: s(14),
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(0,255,255,0.35)',
+    backgroundColor: 'rgba(0,0,50,0.35)',
+    gap: s(16),
+  },
+  playerInfo: {
+    flex: 1,
+    gap: vs(6),
+  },
+  playerMode: {
+    fontFamily: 'Courier New',
+    fontSize: ms(12),
+    letterSpacing: 2,
+    color: '#C3C7FF',
+  },
+  playerTime: {
+    fontFamily: 'Courier New',
+    fontSize: ms(32),
+    fontWeight: '700',
+    letterSpacing: 2,
+  },
+  playerControlsRow: {
+    flexDirection: 'row',
+    gap: s(12),
+  },
+  playerControlButton: {
+    width: s(48),
+    height: s(48),
+    borderRadius: s(24),
+    borderWidth: 2,
+    borderColor: '#00FFFF',
+    backgroundColor: 'rgba(0,255,255,0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  playerProgressSection: {
+    width: '100%',
+    paddingHorizontal: s(4),
+  },
+  playerProgressBar: {
+    width: '100%',
+    height: s(8),
+    backgroundColor: '#333366',
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  playerProgressFill: {
+    height: '100%',
+    borderRadius: 4,
+  },
+  playerStatsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: s(10),
+  },
+  playerStatsLabel: {
+    fontFamily: 'Courier New',
+    fontSize: ms(11),
+    color: '#C3C7FF',
+    letterSpacing: 1,
+  },
+  playerStatsValue: {
+    fontFamily: 'Courier New',
+    fontSize: ms(18),
+    fontWeight: '700',
+    color: '#FFFF00',
+  },
   statsRow: {
     marginTop: vs(24),
     alignItems: 'center',
@@ -350,3 +530,4 @@ const styles = StyleSheet.create({
     color: '#FFFF00',
   },
 });
+

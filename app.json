@@ -14,7 +14,16 @@
     "web": {
       "bundler": "metro",
       "output": "single",
-      "favicon": "./assets/images/favicon.png"
+      "favicon": "./assets/images/favicon.png",
+      "name": "Retro Odak",
+      "shortName": "RetroOdak",
+      "display": "standalone",
+      "backgroundColor": "#05051a",
+      "themeColor": "#080830",
+      "startUrl": ".",
+      "scope": ".",
+      "orientation": "portrait",
+      "registerServiceWorker": true
     },
     "plugins": [
       "expo-router",
@@ -25,3 +34,4 @@
     }
   }
 }
+
