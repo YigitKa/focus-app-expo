@@ -273,8 +273,16 @@ export function SessionStatsProvider({ children }: { children: React.ReactNode }
       const base = options?.keepDifficulty
         ? { ...DEFAULT_STATS, achievementDifficulty: prev.achievementDifficulty }
         : DEFAULT_STATS;
-      AsyncStorage.setItem(KEY, JSON.stringify(base)).catch(() => {});
-      return base;
+      const evaluated = evaluateAchievements(base, base.achievementDifficulty);
+      const next = {
+        ...base,
+        unlockedAchievements: {
+          ...base.unlockedAchievements,
+          ...evaluated,
+        },
+      };
+      AsyncStorage.setItem(KEY, JSON.stringify(next)).catch(() => {});
+      return next;
     });
   }, []);
 

@@ -645,15 +645,14 @@ const styles = StyleSheet.create({
     width: '100%',
     alignItems: 'stretch',
     marginTop: vs(24),
-  },
-  scoreSectionPortrait: {
     paddingHorizontal: s(12),
   },
+  scoreSectionPortrait: {},
   scoreSectionLandscape: {
     marginTop: vs(16),
   },
   scoreSectionTitle: {
-    fontFamily: 'monospace',
+    fontFamily: 'Courier New',
     fontSize: ms(12),
     color: palette.primary,
     letterSpacing: 2,
