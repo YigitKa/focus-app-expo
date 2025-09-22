@@ -20,11 +20,6 @@ export default function SettingsScreen() {
   const { difficulty, setAchievementDifficulty, resetStats } = useSessionStats();
   const uiLang = resolveLang(prefs.language);
   const difficultyOptions: DifficultyLevel[] = ['easy', 'normal', 'hard'];
-  const difficultyDetails = difficultyOptions.map(level => ({
-    level,
-    label: t(`difficulty.${level}`, uiLang),
-    description: t(`settings.difficulty.${level}`, uiLang),
-  }));
   const [settings, setSettings] = useState({
     soundEnabled: true,
     vibrateEnabled: true,

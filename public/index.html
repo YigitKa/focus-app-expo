@@ -23,6 +23,19 @@
         flex: 1;
       }
     </style>
+    <style id="app-scrollbar-hide">
+      /* Hide scrollbars inside the app while preserving scroll */
+      #root, #root * {
+        scrollbar-width: none;       /* Firefox */
+        -ms-overflow-style: none;    /* IE/Edge */
+      }
+      #root::-webkit-scrollbar,
+      #root *::-webkit-scrollbar {
+        width: 0 !important;         /* Chrome/Safari */
+        height: 0 !important;
+        background: transparent !important;
+      }
+    </style>
     <link rel="manifest" href="/manifest.json" />
     <meta name="theme-color" content="#080830" />
     <link rel="icon" href="/favicon.ico" />

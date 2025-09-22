@@ -7,15 +7,29 @@ import {
   useWindowDimensions,
   Animated,
   ScrollView,
+  Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Play, Pause, RotateCcw } from 'lucide-react-native';
+import {
+  Play,
+  Pause,
+  RotateCcw,
+  Coffee,
+  Moon,
+  Flame,
+  Zap,
+  Trophy,
+  Clock as ClockIcon,
+  Target,
+  Timer as TimerIcon,
+} from 'lucide-react-native';
 import { s, vs, ms, clamp, msc } from '@/lib/responsive';
 import { t, resolveLang } from '@/lib/i18n';
 import { usePrefs } from '@/context/PrefsContext';
 import { useSessionStats } from '@/context/SessionStatsContext';
 
-type Mode = 'work' | 'short' | 'long';
+type Mode = 'work' | 'short' | 'long' | 'free';
+type ScoreItem = { key: string; label: string; value: string; emphasis?: boolean; icon: React.ReactNode };
 
 const palette = {
   primary: '#00FFFF', // Cyan
@@ -39,17 +53,74 @@ const TimerScreen = () => {
   const { stats: sessionStats, recordSession } = useSessionStats();
   const totals = sessionStats.totals;
   const totalScore = sessionStats.totalScore;
-  const scoreItems = useMemo(() => [
-    { key: 'work', label: t('timer.score.work', uiLang), value: totals.work.toString() },
-    { key: 'short', label: t('timer.score.short', uiLang), value: totals.short.toString() },
-    { key: 'long', label: t('timer.score.long', uiLang), value: totals.long.toString() },
-    { key: 'streak', label: t('timer.score.streak', uiLang), value: `${sessionStats.currentStreakDays}/${sessionStats.bestStreakDays}` },
-    { key: 'combo', label: t('timer.score.combo', uiLang), value: `${sessionStats.currentScoreStreak}/${sessionStats.bestScoreStreak}` },
-    { key: 'score', label: t('timer.score.total', uiLang), value: totalScore.toString(), emphasis: true },
-  ], [
+  const focusSeconds = sessionStats.focusSeconds;
+  const formatCompactTime = (seconds: number) => {
+    const hours = Math.floor(seconds / 3600);
+    const mins = Math.floor((seconds % 3600) / 60);
+    if (hours > 0) return `${hours}h`;
+    return `${mins}m`;
+  };
+
+  const scoreItems: ScoreItem[] = useMemo(() => {
+    // Larger icons in tiles
+    const iconSize = msc(26, 20, 30);
+    return [
+      {
+        key: 'work',
+        label: t('timer.score.work', uiLang),
+        value: totals.work.toString(),
+        icon: <Target size={iconSize} color={palette.secondary} strokeWidth={2} />,
+      },
+      {
+        key: 'short',
+        label: t('timer.score.short', uiLang),
+        value: totals.short.toString(),
+        icon: <Coffee size={iconSize} color={palette.primary} strokeWidth={2} />,
+      },
+      {
+        key: 'long',
+        label: t('timer.score.long', uiLang),
+        value: totals.long.toString(),
+        icon: <Moon size={iconSize} color={palette.success} strokeWidth={2} />,
+      },
+      {
+        key: 'sessions',
+        label: t('stats.sessions', uiLang),
+        value: sessionStats.totalSessions.toString(),
+        icon: <ClockIcon size={iconSize} color={palette.primary} strokeWidth={2} />,
+      },
+      {
+        key: 'focus',
+        label: t('stats.focusTime', uiLang),
+        value: formatCompactTime(focusSeconds),
+        icon: <TimerIcon size={iconSize} color={palette.secondary} strokeWidth={2} />,
+      },
+      {
+        key: 'streak',
+        label: t('timer.score.streak', uiLang),
+        value: `${sessionStats.currentStreakDays}/${sessionStats.bestStreakDays}`,
+        icon: <Flame size={iconSize} color={palette.accent} strokeWidth={2} />,
+      },
+      {
+        key: 'combo',
+        label: t('timer.score.combo', uiLang),
+        value: `${sessionStats.currentScoreStreak}/${sessionStats.bestScoreStreak}`,
+        icon: <Zap size={iconSize} color={palette.warning} strokeWidth={2} />,
+      },
+      {
+        key: 'score',
+        label: t('timer.score.total', uiLang),
+        value: totalScore.toString(),
+        emphasis: true,
+        icon: <Trophy size={iconSize} color={palette.warning} strokeWidth={2} />,
+      },
+    ];
+  }, [
     totals.work,
     totals.short,
     totals.long,
+    sessionStats.totalSessions,
+    focusSeconds,
     sessionStats.currentStreakDays,
     sessionStats.bestStreakDays,
     sessionStats.currentScoreStreak,
@@ -65,6 +136,7 @@ const TimerScreen = () => {
     work: workSec,
     short: shortSec,
     long: longSec,
+    free: 0, // counts up
   };
 
   const [timeLeft, setTimeLeft] = useState(workSec); // default; synced below
@@ -74,17 +146,20 @@ const TimerScreen = () => {
   const isLandscape = winW > winH;
   const isPortrait = !isLandscape;
   const isCompact = isPortrait ? winW < 420 : winH < 540 || winW < 640;
+  const isWeb = Platform.OS === 'web';
   const usePlayerLayout = isLandscape;
+  // Make the ring smaller while enlarging time text later
   const circleSize = clamp(
-    base * (isCompact && isPortrait ? 0.42 : 0.5),
-    isCompact && isPortrait ? 150 : 220,
-    isCompact && isPortrait ? 260 : 360
+    base * (isCompact && isPortrait ? 0.36 : 0.44),
+    isCompact && isPortrait ? 130 : 200,
+    isCompact && isPortrait ? 220 : 320
   );
   const controlIcon = usePlayerLayout ? msc(28, 22, 34) : isCompact ? msc(22, 18, 26) : msc(26, 20, 30);
   const buttonSize = isCompact || usePlayerLayout ? clamp(s(56), 50, 80) : clamp(s(64), 56, 84);
   const titleSize = usePlayerLayout ? msc(24, 18, 30) : isCompact ? msc(22, 16, 26) : msc(28, 18, 30);
   const subtitleSize = usePlayerLayout ? msc(13, 11, 18) : isCompact ? msc(12, 10, 16) : msc(14, 12, 18);
-  const timeSize = usePlayerLayout ? msc(34, 26, 44) : isCompact ? msc(32, 24, 40) : msc(40, 28, 48);
+  // Bigger time text
+  const timeSize = usePlayerLayout ? msc(44, 34, 56) : isCompact ? msc(40, 30, 52) : msc(52, 36, 64);
   const presetWidth = usePlayerLayout
     ? clamp(base * 0.28, 120, 200)
     : clamp(base * (isCompact ? 0.38 : 0.24), isCompact ? 96 : 92, isCompact ? 132 : 148);
@@ -101,24 +176,29 @@ const TimerScreen = () => {
   const playerContainerGap = vs(usePlayerLayout ? 20 : 16);
   const playerContainerMarginTop = vs(usePlayerLayout ? 24 : 12);
 
-  const total = presetTimes[mode];
-  const progress = ((total - timeLeft) / Math.max(1, total)) * 100;
+  const isBreak = mode === 'short' || mode === 'long';
+  const total = mode === 'free' ? workSec : presetTimes[mode];
+  const progress = mode === 'free'
+    ? (Math.min(timeLeft, total) / Math.max(1, total)) * 100
+    : ((total - timeLeft) / Math.max(1, total)) * 100;
 
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const glowAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     let interval: ReturnType<typeof setInterval> | null = null;
-    if (isActive && timeLeft > 0) {
-      interval = setInterval(() => setTimeLeft(prev => prev - 1), 1000);
+    if (isActive) {
+      interval = setInterval(() =>
+        setTimeLeft(prev => (mode === 'free' ? prev + 1 : Math.max(prev - 1, 0))),
+      1000);
     }
     return () => {
       if (interval) clearInterval(interval);
     };
-  }, [isActive, timeLeft]);
+  }, [isActive, mode]);
 
   useEffect(() => {
-    if (timeLeft === 0) {
+    if (mode !== 'free' && timeLeft === 0) {
       recordSession(mode, total);
       setIsActive(false);
       if (mode === 'work') {
@@ -131,7 +211,7 @@ const TimerScreen = () => {
 
   // Sync timeLeft when mode or preset durations change
   useEffect(() => {
-    setTimeLeft(mode === 'work' ? workSec : mode === 'short' ? shortSec : longSec);
+    setTimeLeft(mode === 'work' ? workSec : mode === 'short' ? shortSec : mode === 'long' ? longSec : 0);
   }, [mode, workSec, shortSec, longSec]);
 
   useEffect(() => {
@@ -182,21 +262,30 @@ const TimerScreen = () => {
   };
 
   const resetTimer = () => {
+    if (mode === 'free' && timeLeft > 0) {
+      // Treat free focus as a work session when finished
+      recordSession('work', timeLeft);
+    }
     setIsActive(false);
     setMode('work');
     setTimeLeft(Math.max(1, prefs.workDuration) * 60);
   };
 
   const handlePresetPress = (nextMode: Mode) => {
+    // If leaving free mode with elapsed time, record it as work
+    if (mode === 'free' && nextMode !== 'free' && timeLeft > 0) {
+      recordSession('work', timeLeft);
+    }
     setMode(nextMode);
     setIsActive(false);
-    setTimeLeft(presetTimes[nextMode]);
+    setTimeLeft(nextMode === 'free' ? 0 : presetTimes[nextMode]);
   };
 
   const presetOptions: { key: Mode; label: string }[] = [
     { key: 'work', label: t('settings.work', uiLang) },
     { key: 'short', label: t('settings.shortBreak', uiLang) },
     { key: 'long', label: t('settings.longBreak', uiLang) },
+    { key: 'free', label: t('settings.freeFocus', uiLang) },
   ];
 
   const presetButtons = presetOptions.map(({ key, label }) => (
@@ -222,6 +311,10 @@ const TimerScreen = () => {
     </TouchableOpacity>
   ));
 
+  // Fixed 4x2 grid for the scoreboard
+  const portraitColumns = 4;
+  const portraitBasis = '23%';
+
   const renderScoreBoard = (variant: 'portrait' | 'landscape') => (
     <View
       style={[
@@ -244,11 +337,26 @@ const TimerScreen = () => {
             style={[
               styles.scoreItem,
               variant === 'landscape' && styles.scoreItemLandscape,
+              // On wide web portrait, show smaller side-by-side tiles
+              { flexBasis: portraitBasis, maxWidth: portraitBasis },
               item.emphasis && styles.scoreItemEmphasis,
             ]}
           >
+            <View style={styles.scoreIcon}>{item.icon}</View>
             <Text style={styles.scoreLabel}>{item.label}</Text>
-            <Text style={[styles.scoreValue, { color: item.key === 'work' ? palette.secondary : item.key === 'short' ? palette.primary : item.key === 'long' ? palette.success : item.key === 'streak' ? palette.accent : palette.warning }]}>{item.value}</Text>
+            <Text style={[
+              styles.scoreValue,
+              {
+                color:
+                  item.key === 'work' ? palette.secondary :
+                  item.key === 'short' ? palette.primary :
+                  item.key === 'long' ? palette.success :
+                  item.key === 'streak' ? palette.accent :
+                  item.key === 'combo' ? palette.warning :
+                  palette.warning,
+              },
+            ]}
+            >{item.value}</Text>
           </View>
         ))}
       </View>
@@ -265,150 +373,308 @@ const TimerScreen = () => {
       ]}
     >
       <View style={styles.gridOverlay} />
-      
-      <View style={[styles.header, isCompact && styles.headerCompact, usePlayerLayout && styles.headerLandscape]}>
-        <Text style={[styles.title, { fontSize: titleSize }]}>{t('timer.heading', uiLang)}</Text>
-        <Text style={[styles.subtitle, { fontSize: subtitleSize }]}>
-          {mode === 'work' ? t('timer.focus', uiLang) : t('timer.break', uiLang)} ? {formatTime(timeLeft)}
-        </Text>
-      </View>
-
-      {useScrollPresets ? (
+      {isWeb ? (
         <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={[styles.presetScrollContent, { paddingBottom: presetSpacing }]}
+          style={styles.webScroll}
+          contentContainerStyle={styles.webScrollContent}
+          showsVerticalScrollIndicator={true}
         >
-          {presetButtons}
-        </ScrollView>
-      ) : (
-        <View
-          style={[
-            styles.presetRow,
-            usePlayerLayout && { width: '100%', maxWidth: playerMaxWidth },
-            { marginBottom: presetSpacing },
-          ]}
-        >
-          {presetButtons}
-        </View>
-      )}
-
-      {usePlayerLayout ? (
-        <View
-          style={[
-            styles.playerContainer,
-            {
-              alignSelf: 'center',
-              width: '100%',
-              flexGrow: 1,
-              maxWidth: playerMaxWidth,
-              marginTop: playerContainerMarginTop,
-              gap: playerContainerGap,
-            },
-          ]}
-        >
-          <View style={[styles.playerCard, styles.playerCardLandscape]}>
-            <View style={styles.playerInfo}>
-              <Text style={[styles.playerMode, { color: mode !== 'work' ? palette.accent : palette.primary }]}>
-                {mode === 'work' ? t('timer.focus', uiLang) : t('timer.break', uiLang)}
-              </Text>
-              <Text style={[styles.playerTime, { color: mode !== 'work' ? palette.accent : palette.secondary, fontSize: timeSize }]}>
-                {formatTime(timeLeft)}
-              </Text>
-            </View>
-            <View style={[styles.playerControlsRow, styles.playerControlsRowLandscape]}>
-              <TouchableOpacity
-                style={[
-                  styles.playerControlButton,
-                  { width: playerButtonSize, height: playerButtonSize, borderRadius: playerButtonSize / 2 },
-                ]}
-                onPress={toggleTimer}
-              >
-                {isActive ? (
-                  <Pause size={controlIcon} color={palette.primary} strokeWidth={2} />
-                ) : (
-                  <Play size={controlIcon} color={palette.primary} strokeWidth={2} />
-                )}
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[
-                  styles.playerControlButton,
-                  { width: playerButtonSize, height: playerButtonSize, borderRadius: playerButtonSize / 2 },
-                ]}
-                onPress={resetTimer}
-              >
-                <RotateCcw size={controlIcon} color={palette.primary} strokeWidth={2} />
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          <View style={[styles.playerProgressSection, styles.playerProgressSectionLandscape]}>
-            <View style={styles.playerProgressBar}>
-              <Animated.View
-                style={[
-                  styles.playerProgressFill,
-                  {
-                    width: `${progress}%`,
-                    backgroundColor: mode !== 'work' ? palette.accent : palette.secondary,
-                  },
-                ]}
-              />
-            </View>
-          </View>
-
-          {renderScoreBoard('landscape')}
-        </View>
-      ) : (
-        <View style={styles.timerSection}>
-          <Animated.View 
-            style={[
-              styles.timerCircle,
-              {
-                width: circleSize,
-                height: circleSize,
-                borderRadius: circleSize / 2,
-                transform: [{ scale: pulseAnim }],
-                shadowColor: mode !== 'work' ? palette.accent : palette.secondary,
-                shadowOpacity: glowAnim,
-              }
-            ]}
-          >
-            <Text style={[styles.timeText, { color: mode !== 'work' ? palette.accent : palette.secondary, fontSize: timeSize }]}>
-              {formatTime(timeLeft)}
+          <View style={[styles.header, isCompact && styles.headerCompact, usePlayerLayout && styles.headerLandscape]}>
+            <Text style={[styles.title, { fontSize: titleSize }]}>{t('timer.heading', uiLang)}</Text>
+            <Text style={[styles.subtitle, { fontSize: subtitleSize }]}>
+              {isBreak ? t('timer.break', uiLang) : t('timer.focus', uiLang)} ? {formatTime(timeLeft)}
             </Text>
-          </Animated.View>
+          </View>
 
-          <View style={styles.progressContainer}>
-            <View style={styles.progressBar}>
+          {useScrollPresets ? (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={[styles.presetScrollContent, { paddingBottom: presetSpacing }]}
+            >
+              {presetButtons}
+            </ScrollView>
+          ) : (
+            <View
+              style={[
+                styles.presetRow,
+                usePlayerLayout && { width: '100%', maxWidth: playerMaxWidth },
+                { marginBottom: presetSpacing },
+              ]}
+            >
+              {presetButtons}
+            </View>
+          )}
+
+          {usePlayerLayout ? (
+            <View
+              style={[
+                styles.playerContainer,
+                {
+                  alignSelf: 'center',
+                  width: '100%',
+                  flexGrow: 1,
+                  maxWidth: playerMaxWidth,
+                  marginTop: playerContainerMarginTop,
+                  gap: playerContainerGap,
+                },
+              ]}
+            >
+              <View style={[styles.playerCard, styles.playerCardLandscape]}>
+                <View style={styles.playerInfo}>
+                  <Text style={[styles.playerMode, { color: isBreak ? palette.accent : palette.primary }]}>
+                    {isBreak ? t('timer.break', uiLang) : t('timer.focus', uiLang)}
+                  </Text>
+                  <Text style={[styles.playerTime, { color: isBreak ? palette.accent : palette.secondary, fontSize: timeSize }]}>
+                    {formatTime(timeLeft)}
+                  </Text>
+                </View>
+                <View style={[styles.playerControlsRow, styles.playerControlsRowLandscape]}>
+                  <TouchableOpacity
+                    style={[
+                      styles.playerControlButton,
+                      { width: playerButtonSize, height: playerButtonSize, borderRadius: playerButtonSize / 2 },
+                    ]}
+                    onPress={toggleTimer}
+                  >
+                    {isActive ? (
+                      <Pause size={controlIcon} color={palette.primary} strokeWidth={2} />
+                    ) : (
+                      <Play size={controlIcon} color={palette.primary} strokeWidth={2} />
+                    )}
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[
+                      styles.playerControlButton,
+                      { width: playerButtonSize, height: playerButtonSize, borderRadius: playerButtonSize / 2 },
+                    ]}
+                    onPress={resetTimer}
+                  >
+                    <RotateCcw size={controlIcon} color={palette.primary} strokeWidth={2} />
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              <View style={[styles.playerProgressSection, styles.playerProgressSectionLandscape]}>
+                <View style={styles.playerProgressBar}>
+                  <Animated.View
+                    style={[
+                      styles.playerProgressFill,
+                      {
+                        width: `${progress}%`,
+                        backgroundColor: isBreak ? palette.accent : palette.secondary,
+                      },
+                    ]}
+                  />
+                </View>
+              </View>
+
+              {renderScoreBoard('landscape')}
+            </View>
+          ) : (
+            <View style={styles.timerSection}>
+              <View style={styles.timerCircleContainer}>
               <Animated.View 
                 style={[
-                  styles.progressFill,
-                  { 
-                    width: `${progress}%`,
-                    backgroundColor: mode !== 'work' ? palette.accent : palette.secondary,
+                  styles.timerCircle,
+                  {
+                    width: circleSize,
+                    height: circleSize,
+                    borderRadius: circleSize / 2,
+                    transform: [{ scale: pulseAnim }],
+                    shadowColor: isBreak ? palette.accent : palette.secondary,
+                    shadowOpacity: glowAnim,
                   }
-                ]} 
-              />
+                ]}
+              >
+                <Text style={[styles.timeText, { color: isBreak ? palette.accent : palette.secondary, fontSize: timeSize }]}>
+                  {formatTime(timeLeft)}
+                </Text>
+              </Animated.View>
+              </View>
+
+              <View style={styles.progressContainer}>
+                <View style={styles.progressBar}>
+                  <Animated.View 
+                    style={[
+                      styles.progressFill,
+                      { 
+                        width: `${progress}%`,
+                        backgroundColor: isBreak ? palette.accent : palette.secondary,
+                      }
+                    ]} 
+                  />
+                </View>
+              </View>
+
+              <View style={styles.controlButtons}>
+                <TouchableOpacity style={[styles.controlButton, { width: buttonSize, height: buttonSize, borderRadius: buttonSize / 2 }]} onPress={toggleTimer}>
+                  {isActive ? (
+                    <Pause size={controlIcon} color={palette.primary} strokeWidth={2} />
+                  ) : (
+                    <Play size={controlIcon} color={palette.primary} strokeWidth={2} />
+                  )}
+                </TouchableOpacity>
+
+                <TouchableOpacity style={[styles.controlButton, { width: buttonSize, height: buttonSize, borderRadius: buttonSize / 2 }]} onPress={resetTimer}>
+                  <RotateCcw size={controlIcon} color={palette.primary} strokeWidth={2} />
+                </TouchableOpacity>
+              </View>
+
+              {renderScoreBoard('portrait')}
             </View>
+          )}
+        </ScrollView>
+      ) : (
+        <>
+          <View style={[styles.header, isCompact && styles.headerCompact, usePlayerLayout && styles.headerLandscape]}>
+            <Text style={[styles.title, { fontSize: titleSize }]}>{t('timer.heading', uiLang)}</Text>
+            <Text style={[styles.subtitle, { fontSize: subtitleSize }]}>
+              {isBreak ? t('timer.break', uiLang) : t('timer.focus', uiLang)} ? {formatTime(timeLeft)}
+            </Text>
           </View>
 
-          <View style={styles.controlButtons}>
-            <TouchableOpacity style={[styles.controlButton, { width: buttonSize, height: buttonSize, borderRadius: buttonSize / 2 }]} onPress={toggleTimer}>
-              {isActive ? (
-                <Pause size={controlIcon} color={palette.primary} strokeWidth={2} />
-              ) : (
-                <Play size={controlIcon} color={palette.primary} strokeWidth={2} />
-              )}
-            </TouchableOpacity>
+          {useScrollPresets ? (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={[styles.presetScrollContent, { paddingBottom: presetSpacing }]}
+            >
+              {presetButtons}
+            </ScrollView>
+          ) : (
+            <View
+              style={[
+                styles.presetRow,
+                usePlayerLayout && { width: '100%', maxWidth: playerMaxWidth },
+                { marginBottom: presetSpacing },
+              ]}
+            >
+              {presetButtons}
+            </View>
+          )}
 
-            <TouchableOpacity style={[styles.controlButton, { width: buttonSize, height: buttonSize, borderRadius: buttonSize / 2 }]} onPress={resetTimer}>
-              <RotateCcw size={controlIcon} color={palette.primary} strokeWidth={2} />
-            </TouchableOpacity>
-          </View>
+          {usePlayerLayout ? (
+            <View
+              style={[
+                styles.playerContainer,
+                {
+                  alignSelf: 'center',
+                  width: '100%',
+                  flexGrow: 1,
+                  maxWidth: playerMaxWidth,
+                  marginTop: playerContainerMarginTop,
+                  gap: playerContainerGap,
+                },
+              ]}
+            >
+              <View style={[styles.playerCard, styles.playerCardLandscape]}>
+                <View style={styles.playerInfo}>
+                  <Text style={[styles.playerMode, { color: isBreak ? palette.accent : palette.primary }]}>
+                    {isBreak ? t('timer.break', uiLang) : t('timer.focus', uiLang)}
+                  </Text>
+                  <Text style={[styles.playerTime, { color: isBreak ? palette.accent : palette.secondary, fontSize: timeSize }]}>
+                    {formatTime(timeLeft)}
+                  </Text>
+                </View>
+                <View style={[styles.playerControlsRow, styles.playerControlsRowLandscape]}>
+                  <TouchableOpacity
+                    style={[
+                      styles.playerControlButton,
+                      { width: playerButtonSize, height: playerButtonSize, borderRadius: playerButtonSize / 2 },
+                    ]}
+                    onPress={toggleTimer}
+                  >
+                    {isActive ? (
+                      <Pause size={controlIcon} color={palette.primary} strokeWidth={2} />
+                    ) : (
+                      <Play size={controlIcon} color={palette.primary} strokeWidth={2} />
+                    )}
+                  </TouchableOpacity>
 
-          {renderScoreBoard('portrait')}
-        </View>
+                  <TouchableOpacity
+                    style={[
+                      styles.playerControlButton,
+                      { width: playerButtonSize, height: playerButtonSize, borderRadius: playerButtonSize / 2 },
+                    ]}
+                    onPress={resetTimer}
+                  >
+                    <RotateCcw size={controlIcon} color={palette.primary} strokeWidth={2} />
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              <View style={[styles.playerProgressSection, styles.playerProgressSectionLandscape]}>
+                <View style={styles.playerProgressBar}>
+                  <Animated.View
+                    style={[
+                      styles.playerProgressFill,
+                      {
+                        width: `${progress}%`,
+                        backgroundColor: isBreak ? palette.accent : palette.secondary,
+                      },
+                    ]}
+                  />
+                </View>
+              </View>
+
+              {renderScoreBoard('landscape')}
+            </View>
+          ) : (
+            <View style={styles.timerSection}>
+              <View style={styles.timerCircleContainer}>
+              <Animated.View 
+                style={[
+                  styles.timerCircle,
+                  {
+                    width: circleSize,
+                    height: circleSize,
+                    borderRadius: circleSize / 2,
+                    transform: [{ scale: pulseAnim }],
+                    shadowColor: isBreak ? palette.accent : palette.secondary,
+                    shadowOpacity: glowAnim,
+                  }
+                ]}
+              >
+                <Text style={[styles.timeText, { color: isBreak ? palette.accent : palette.secondary, fontSize: timeSize }]}>
+                  {formatTime(timeLeft)}
+                </Text>
+              </Animated.View>
+              </View>
+
+              <View style={styles.progressContainer}>
+                <View style={styles.progressBar}>
+                  <Animated.View 
+                    style={[
+                      styles.progressFill,
+                      { 
+                        width: `${progress}%`,
+                        backgroundColor: isBreak ? palette.accent : palette.secondary,
+                      }
+                    ]} 
+                  />
+                </View>
+              </View>
+
+              <View style={styles.controlButtons}>
+                <TouchableOpacity style={[styles.controlButton, { width: buttonSize, height: buttonSize, borderRadius: buttonSize / 2 }]} onPress={toggleTimer}>
+                  {isActive ? (
+                    <Pause size={controlIcon} color={palette.primary} strokeWidth={2} />
+                  ) : (
+                    <Play size={controlIcon} color={palette.primary} strokeWidth={2} />
+                  )}
+                </TouchableOpacity>
+
+                <TouchableOpacity style={[styles.controlButton, { width: buttonSize, height: buttonSize, borderRadius: buttonSize / 2 }]} onPress={resetTimer}>
+                  <RotateCcw size={controlIcon} color={palette.primary} strokeWidth={2} />
+                </TouchableOpacity>
+              </View>
+
+              {renderScoreBoard('portrait')}
+            </View>
+          )}
+        </>
       )}
 
     </LinearGradient>
@@ -422,17 +688,25 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   portraitContainer: {
-    paddingHorizontal: s(16),
-    paddingTop: vs(24),
-    paddingBottom: vs(24),
+    paddingHorizontal: s(8),
+    paddingTop: vs(12),
+    paddingBottom: vs(12),
   },
   compactContainer: {
-    paddingTop: vs(16),
-    paddingBottom: vs(16),
+    paddingTop: vs(8),
+    paddingBottom: vs(8),
   },
   landscapeContainer: {
-    paddingHorizontal: s(28),
-    paddingVertical: vs(18),
+    paddingHorizontal: s(16),
+    paddingVertical: vs(12),
+  },
+  // Scroll wrapper for web to enable vertical scrolling
+  webScroll: {
+    flex: 1,
+    width: '100%',
+  },
+  webScrollContent: {
+    paddingBottom: vs(80), // leave room above the tab bar
   },
   gridOverlay: {
     position: 'absolute',
@@ -443,33 +717,33 @@ const styles = StyleSheet.create({
   },
   header: {
     alignItems: 'center',
-    paddingVertical: vs(16),
+    paddingVertical: vs(8),
   },
   headerCompact: {
-    paddingVertical: vs(10),
+    paddingVertical: vs(6),
   },
   headerLandscape: {
-    paddingVertical: vs(12),
+    paddingVertical: vs(8),
   },
   presetScrollContent: {
-    paddingHorizontal: s(12),
-    gap: s(8),
-    columnGap: s(8),
+    paddingHorizontal: s(6),
+    gap: s(6),
+    columnGap: s(6),
     alignItems: 'center',
   },
   presetRow: {
     flexDirection: 'row',
     justifyContent: 'center',
     flexWrap: 'wrap',
-    gap: s(8),
-    marginTop: vs(10),
-    paddingHorizontal: s(12),
+    gap: s(6),
+    marginTop: vs(6),
+    paddingHorizontal: s(8),
     alignSelf: 'center',
     zIndex: 2,
   },
   presetButton: {
-    paddingHorizontal: s(12),
-    paddingVertical: s(8),
+    paddingHorizontal: s(10),
+    paddingVertical: s(6),
     borderWidth: 1,
     borderColor: palette.border,
     borderRadius: 16,
@@ -518,8 +792,8 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: s(24),
-    paddingTop: vs(12),
+    paddingHorizontal: s(16),
+    paddingTop: vs(8),
   },
   timerCircle: {
     borderWidth: 4,
@@ -539,7 +813,7 @@ const styles = StyleSheet.create({
   },
   progressContainer: {
     width: '100%',
-    marginTop: vs(24),
+    marginTop: vs(16),
     alignItems: 'center',
   },
   progressBar: {
@@ -555,7 +829,7 @@ const styles = StyleSheet.create({
   },
   controlButtons: {
     flexDirection: 'row',
-    marginTop: vs(24),
+    marginTop: vs(16),
     gap: s(20),
   },
   controlButton: {
@@ -570,7 +844,7 @@ const styles = StyleSheet.create({
   },
   playerContainer: {
     width: '100%',
-    paddingHorizontal: s(16),
+    paddingHorizontal: s(12),
   },
   playerCard: {
     flexDirection: 'row',
@@ -644,8 +918,8 @@ const styles = StyleSheet.create({
   scoreSection: {
     width: '100%',
     alignItems: 'stretch',
-    marginTop: vs(24),
-    paddingHorizontal: s(12),
+    marginTop: vs(16),
+    paddingHorizontal: s(8),
   },
   scoreSectionPortrait: {},
   scoreSectionLandscape: {
@@ -675,34 +949,42 @@ const styles = StyleSheet.create({
   scoreItem: {
     flexGrow: 1,
     flexBasis: '48%',
-    minWidth: s(120),
+    minWidth: 0,
     borderWidth: 1,
     borderColor: 'rgba(0,255,255,0.3)',
     backgroundColor: 'rgba(0,0,50,0.35)',
     borderRadius: 12,
-    paddingVertical: vs(10),
-    paddingHorizontal: s(10),
-    alignItems: 'center',
+    paddingVertical: vs(8),
+    paddingHorizontal: s(8),
+    alignItems: 'stretch',
     gap: vs(6),
   },
   scoreItemLandscape: {
-    flexBasis: '22%',
-    maxWidth: '24%',
+    flexBasis: '23%',
+    maxWidth: '23%',
   },
   scoreItemEmphasis: {
     borderColor: palette.accent,
     backgroundColor: 'rgba(255,255,0,0.12)',
+  },
+  scoreIcon: {
+    marginBottom: vs(2),
+    alignItems: 'center',
+    justifyContent: 'center',
+    alignSelf: 'center',
   },
   scoreLabel: {
     fontFamily: 'monospace',
     fontSize: ms(11),
     color: palette.text,
     letterSpacing: 1,
+    textAlign: 'right',
   },
   scoreValue: {
     fontFamily: 'monospace',
     fontSize: ms(20),
     fontWeight: '700',
     letterSpacing: 1,
+    textAlign: 'right',
   },
 });
