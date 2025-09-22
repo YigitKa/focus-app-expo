@@ -53,15 +53,7 @@ export default function TabLayout() {
           ),
         }}
       />
-      <Tabs.Screen
-        name="stats"
-        options={{
-          title: t('tabs.stats', uiLang).toUpperCase(),
-          tabBarIcon: ({ size, color }) => (
-            <BarChart3 size={size} color={color} strokeWidth={2} />
-          ),
-        }}
-      />
+      
       <Tabs.Screen
         name="settings"
         options={{

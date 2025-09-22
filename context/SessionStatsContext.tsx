@@ -12,6 +12,13 @@ export type AchievementState = {
   target: number;
 };
 
+export type CompletedSession = {
+  id: string;
+  mode: SessionMode;
+  durationSeconds: number;
+  completedAt: string;
+};
+
 export type SessionStats = {
   totals: Record<SessionMode, number>;
   totalSessions: number;
@@ -27,6 +34,7 @@ export type SessionStats = {
   lastWorkDate: string | null;
   lastSessionDate: string | null;
   lastUpdated: string | null;
+  completedSessions: CompletedSession[];
 };
 
 type AchievementDefinition = {
@@ -90,9 +98,11 @@ const DEFAULT_STATS: SessionStats = {
   lastWorkDate: null,
   lastSessionDate: null,
   lastUpdated: null,
+  completedSessions: [],
 };
 
 const KEY = 'session_stats_v1';
+const MAX_SESSION_LOG = 100;
 
 type ResetOptions = { keepDifficulty?: boolean };
 
@@ -120,7 +130,7 @@ function diffInDays(current: string, previous: string) {
 }
 
 function mergeStats(partial: Partial<SessionStats>): SessionStats {
-  return {
+  const merged = {
     ...DEFAULT_STATS,
     ...partial,
     totals: {
@@ -131,7 +141,13 @@ function mergeStats(partial: Partial<SessionStats>): SessionStats {
       ...DEFAULT_STATS.unlockedAchievements,
       ...partial.unlockedAchievements,
     },
+    completedSessions: partial.completedSessions ?? [],
   };
+  // Ensure array is not excessively large on load
+  if (merged.completedSessions.length > MAX_SESSION_LOG) {
+    merged.completedSessions = merged.completedSessions.slice(0, MAX_SESSION_LOG);
+  }
+  return merged;
 }
 
 function evaluateAchievements(stats: SessionStats, difficulty: DifficultyLevel) {
@@ -195,6 +211,17 @@ export function SessionStatsProvider({ children }: { children: React.ReactNode }
   const recordSession = useCallback(
     (mode: SessionMode, durationSeconds: number, completedAt: Date = new Date()) => {
       updateStats(prev => {
+        const completedAtISO = completedAt.toISOString();
+
+        const newSession: CompletedSession = {
+          id: completedAtISO,
+          mode,
+          durationSeconds,
+          completedAt: completedAtISO,
+        };
+
+        const nextCompletedSessions = [newSession, ...(prev.completedSessions ?? [])].slice(0, MAX_SESSION_LOG);
+
         const totals: Record<SessionMode, number> = {
           ...prev.totals,
           [mode]: prev.totals[mode] + 1,
@@ -253,7 +280,8 @@ export function SessionStatsProvider({ children }: { children: React.ReactNode }
           bestScoreStreak,
           lastWorkDate,
           lastSessionDate: sessionDay,
-          lastUpdated: completedAt.toISOString(),
+          lastUpdated: completedAtISO,
+          completedSessions: nextCompletedSessions,
         };
 
         const evaluated = evaluateAchievements(nextStats, nextStats.achievementDifficulty);
