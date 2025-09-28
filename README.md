@@ -1,3 +1,89 @@
+# Retro Focus - Expo Uygulaması
+
+Retro Focus, Expo, React Native ve Expo Router ile oluşturulmuş, neon esintili bir üretkenlik yardımcısıdır. Esnek bir Pomodoro tarzı zamanlayıcıyı, hafif bir görev listesini, zengin üretkenlik analizlerini ve İngilizce ile Türkçe dillerinde tamamen yerelleştirilmiş ayarları bir araya getirir. Proje, kullanıcı arayüzünü duyarlı ve animasyonlu tutarken tek bir kod tabanının mobil ve web platformlarında nasıl dağıtılabileceğini göstermektedir.
+
+## İçindekiler
+- [Genel Bakış](#genel-bakış)
+- [Öne Çıkan Özellikler](#öne-çıkan-özellikler)
+- [Ekran Görüntüleri](#ekran-görüntüleri)
+- [Mimari Notları](#mimari-notları)
+- [Durum ve Kalıcılık](#durum-ve-kalıcılık)
+- [Komutlar ve Araçlar](#komutlar-ve-araçlar)
+- [Dağıtım (Netlify)](#dağıtım-netlify)
+- [Sorun Giderme](#sorun-giderme)
+- [Yol Haritası / Fikirler](#yol-haritası--fikirler)
+- [Lisans](#lisans)
+
+## Genel Bakış
+Retro Focus, ders çalışma veya iş blokları sırasında odaklanmanıza yardımcı olur. Çalışma, kısa mola ve uzun mola ön ayarları arasında geçiş yapabilir, kaç seans tamamladığınızı izleyebilir, gün serilerini ve kombo serilerini takip edebilir ve başarı zorluklarıyla mücadeleyi artırabilirsiniz. Tüm tercihler yerel olarak saklanır ve kullanıcı arayüzü dikey veya yatay yönlendirmelere otomatik olarak uyum sağlar.
+
+## Öne Çıkan Özellikler
+- **Zamanlayıcı ve Animasyonlar**: Nabız ve parlama efektleriyle dairesel geri sayım, duyarlı boyutlandırma ve anında ön ayar değiştirme.
+- **Seans Skorbordu**: Her mod için canlı toplamlar, gün serisi ve kombo serisi takibi ve zorluk derecesine duyarlı bir başarı sistemiyle desteklenen bir puanlama.
+- **Başarılar**: Yapılandırılabilir zorluk (kolay, normal, zor), Odak Başlangıcı, Mola Şampiyonu, Zaman Tutucu, Seri Ustası ve Kombo Kırıcı gibi kilometre taşları için eşikleri değiştirir.
+- **İstatistik Paneli**: Üretkenlik dökümü, odaklanma ve mola dağılımı, seri geçmişi ve her başarı için ilerleme çubukları.
+- **Görev Listesi**: Tamamlanan ve toplam görevleri gösteren göstergelerle hızlı yakalama, geçiş yapma ve silme iş akışı.
+- **Ayarlar Paketi**: Dil değiştirici (sistem/İngilizce/Türkçe), zamanlayıcı süre kontrolleri, görsel-işitsel geçişler, zorluk seçici ve korumalı bir "İstatistikleri Sıfırla" eylemi.
+- **Çoklu Dil Desteği**: `lib/i18n.ts` içinde basit bir sözlük aracılığıyla yönetilen İngilizce ve Türkçe metinler.
+- **Duyarlı Düzen**: Paylaşılan duyarlı yardımcılar (`s`, `vs`, `ms`, `msc`, `clamp`), bileşenlerin telefonlarda, tabletlerde ve web'de orantılı kalmasını sağlar.
+- **Web Pro Çubuğu**: Web'de yapışkan bir üst çubuk, zamanı, modu ve hızlı kontrolleri gösterir. Global klavye kısayolları uzman iş akışlarını hızlandırır.
+- **Temalar**: Daha yüksek okunabilirlik için modern "Nova" teması ve klasik bir "Retro" tema. Ayarlar'dan değiştirilebilir.
+- **Web Kısayolları (Masaüstü)**:
+    - `Boşluk` / `K` — Oynat veya duraklat
+    - `R` — Zamanlayıcıyı sıfırla
+    - `1` / `2` / `3` / `4` — Çalışma / Kısa / Uzun / Serbest
+    - `S` — Ayarlar, `T` — Görevler
+    - `?` — Kısayol yardım katmanını aç/kapat
+
+## Ekran Görüntüleri
+- **Zamanlayıcı** (`app/(tabs)/index.tsx`): Ön ayarlar, geri sayım, animasyonlu kadran, ilerleme çubuğu, kontroller ve seans genel bakış skorbordu ile uygulamanın kalbi. Yatay mod, kompakt bir oynatıcı düzenine geçer.
+- **Görevler** (`app/(tabs)/tasks.tsx`): Satır içi ekleme, tamamlama ve silme etkileşimleriyle görevleri yönetin.
+- **İstatistikler** (`app/(tabs)/stats.tsx`): Kartlar, ilerleme çubukları ve seçilen zorluğa uyarlanmış başarı ilerlemesi aracılığıyla üretkenliği görselleştirin.
+- **Ayarlar** (`app/(tabs)/settings.tsx`): Dil, zamanlayıcı süreleri, arayüz geçişleri, başarı zorluğu ve saklanan istatistikleri sıfırlama ayarlarını yapın.
+
+## Mimari Notları
+- **Navigasyon**: `app/(tabs)/_layout.tsx` içinde tanımlanan Expo Router sekmeleri (Zamanlayıcı, Görevler, İstatistikler, Ayarlar).
+- **Sağlayıcılar**: `PrefsContext` dil ve zamanlayıcı sürelerini saklar; `SessionStatsContext` seans toplamlarını, serileri, puanı, başarıları, zorluğu ve sıfırlama mantığını merkezileştirir.
+- **Stil**: Geleneksel React Native `StyleSheet` artı duyarlı yardımcı programlar. Doğrusal gradyanlar retro atmosferi sağlar.
+- **İkonlar ve Hareket**: İkonlar için `lucide-react-native`, nabız ve parlama döngüleri için React Native Animated.
+
+## Durum ve Kalıcılık
+- **Tercihler** (`PrefsContext`): Dil ve zamanlayıcı sürelerini seanslar arasında kalıcı kılmak için `AsyncStorage` kullanır.
+- **Seans İstatistikleri** (`SessionStatsContext`): Mod başına sayıları, toplam odaklanma/mola saniyelerini, puanı, serileri, kilidi açılmış başarıları ve zorluğu kalıcı kılar. Seansları kaydetmek, verileri sıfırlamak (isteğe bağlı zorluk korumasıyla) ve başarıları değerlendirmek için yardımcı yöntemler sağlar.
+- **Uluslararasılaştırma** (`lib/i18n.ts`): Bir `Lang` enum'u tarafından yönlendirilen minimal sözlük; daha fazla yerel ayar eklemek için haritayı genişletin.
+
+## Komutlar ve Araçlar
+- `npm run dev` - Expo geliştirme sunucusunu başlatır (`w` tuşuna basarak web için açın veya Expo Geliştirici Araçları aracılığıyla bir cihazda/emülatörde açın).
+- `npm run build:web` - Web paketini `dist/` içine dışa aktarır (Netlify dağıtımları tarafından kullanılır).
+- `npm run lint` - Expo'nun ESLint ön ayarı aracılığıyla kod denetimi yapar.
+- `npx expo-doctor` - Yerel bağımlılıkların isteğe bağlı sağlık kontrolü.
+
+## Dağıtım (Netlify)
+1. Depoyu GitHub'a (veya başka bir desteklenen Git ana bilgisayarına) itin.
+2. Netlify'de **Yeni site ekle** -> **Mevcut bir projeyi içe aktar**'ı seçin ve depoyu bağlayın.
+3. Derleme komutu: `npm run build:web`
+4. Yayınlama dizini: `dist`
+5. Ortam değişkenleri: `EXPO_USE_STATIC=1`, `EXPO_NO_TELEMETRY=1`
+6. Dağıtın. Dahil edilen `netlify.toml` dosyası, SPA geri dönüşünü `index.html` olarak yapılandırır.
+
+## Sorun Giderme
+- Metro önbelleğini temizle: `npx expo start -c`
+- Bağımlılık sağlığı: `npx expo-doctor`
+- Web düzeni tuhaflıkları: tarayıcı yakınlaştırmasının %100 olduğunu doğrulayın, ardından sert yenileme yapın (Ctrl+Shift+R).
+- İstatistikleri sıfırla: Ayarlar'daki düğmeyi kullanın (zorluğu korur, başarıları ve seans geçmişini siler).
+
+## Yol Haritası / Fikirler
+- Bildirim, ses ve dokunsal geri bildirim geçişlerini gerçek çalışma zamanı efektlerine bağlayın.
+- Uzun molaları otomatikleştirin (örneğin, her 4. çalışma seansında bir) ve isteğe bağlı hatırlatıcılar ekleyin.
+- Görevleri ve istatistikleri çoklu cihaz senkronizasyonu için bulut depolamaya kalıcı olarak kaydedin.
+- Yerelleştirmeyi İngilizce ve Türkçe'nin ötesine genişletin.
+- Seri geçmişi ve başarılar için paylaşma/dışa aktarma seçenekleri ekleyin.
+
+## Lisans
+Retro Focus, [Creative Commons Attribution-NonCommercial 4.0 International](LICENSE) lisansı altında dağıtılmaktadır. Projeyi ticari olmayan amaçlarla, atıfta bulunmak koşuluyla kullanabilir, yeniden düzenleyebilir ve paylaşabilirsiniz. Ticari bir lisans veya alternatif koşullar için yazarlarla iletişime geçin.
+
+---
+
 # Retro Focus - Expo App
 
 Retro Focus is a neon-inspired productivity companion built with Expo, React Native, and Expo Router. It combines a flexible Pomodoro-style timer, a lightweight task list, rich productivity analytics, and fully localised settings in English and Turkish. The project demonstrates how to ship a single codebase across mobile and web while keeping the UI responsive and animated.
