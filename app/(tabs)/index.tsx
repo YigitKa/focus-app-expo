@@ -33,6 +33,11 @@ import { useTheme } from '@/context/ThemeContext';
 type Mode = 'work' | 'short' | 'long' | 'free';
 type ScoreItem = { key: string; label: string; value: string; emphasis?: boolean; icon: React.ReactNode };
 
+const FONT_REGULAR = 'Poppins-Regular';
+const FONT_MEDIUM = 'Poppins-Medium';
+const FONT_SEMIBOLD = 'Poppins-SemiBold';
+const FONT_BOLD = 'Poppins-Bold';
+
 const TimerScreen = () => {
   const { width: winW, height: winH } = useWindowDimensions();
   const { prefs } = usePrefs();
@@ -400,10 +405,10 @@ const TimerScreen = () => {
               <View style={[styles.scoreIcon, { backgroundColor: tileBackground }]}>{item.icon}</View>
               <Text
                 style={styles.scoreLabel}
-                numberOfLines={2}
-                ellipsizeMode="tail"
+                numberOfLines={3}
+                ellipsizeMode="clip"
                 adjustsFontSizeToFit
-                minimumFontScale={0.65}
+                minimumFontScale={0.4}
               >
                 {item.label}
               </Text>
@@ -890,7 +895,7 @@ const TimerScreen = () => {
               <Text style={styles.shortcutRow}>1 / 2 / 3 / 4 — Work / Short / Long / Free</Text>
               <Text style={styles.shortcutRow}>S — Settings, T — Tasks, ? — Toggle help</Text>
               <TouchableOpacity onPress={() => setShowShortcuts(false)} style={[styles.webDockBtn, { alignSelf: 'center', marginTop: vs(10) }]}>
-                <Text style={{ color: palette.primary, fontFamily: 'Courier New' }}>Close</Text>
+                <Text style={{ color: palette.primary, fontFamily: FONT_SEMIBOLD }}>Close</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -1096,16 +1101,15 @@ const makeStyles = (palette: any) => StyleSheet.create({
     gap: vs(12),
   },
   statsTitle: {
-    fontFamily: 'Courier New',
+    fontFamily: FONT_BOLD,
     fontSize: ms(22),
-    fontWeight: 'bold',
     color: '#FFFF00',
     letterSpacing: 3,
     textShadowColor: '#FF00FF',
     textShadowRadius: 10,
   },
   statsSubtitle: {
-    fontFamily: 'Courier New',
+    fontFamily: FONT_SEMIBOLD,
     fontSize: ms(12),
     color: '#C3C7FF',
     letterSpacing: 1,
@@ -1122,15 +1126,14 @@ const makeStyles = (palette: any) => StyleSheet.create({
     backgroundColor: 'rgba(0,255,255,0.15)',
   },
   difficultyLabel: {
-    fontFamily: 'Courier New',
+    fontFamily: FONT_SEMIBOLD,
     fontSize: ms(10),
     color: '#00FFFF',
     letterSpacing: 1,
   },
   difficultyValue: {
-    fontFamily: 'Courier New',
+    fontFamily: FONT_BOLD,
     fontSize: ms(12),
-    fontWeight: 'bold',
     color: '#FFFF00',
     letterSpacing: 1,
   },
@@ -1181,7 +1184,7 @@ const makeStyles = (palette: any) => StyleSheet.create({
     backgroundColor: 'rgba(0,255,255,0.12)',
   },
   presetText: {
-    fontFamily: 'monospace',
+    fontFamily: FONT_REGULAR,
     fontSize: ms(10),
     color: palette.text,
     letterSpacing: 1,
@@ -1192,19 +1195,18 @@ const makeStyles = (palette: any) => StyleSheet.create({
   },
   presetTextActive: {
     color: palette.primary,
-    fontWeight: '700',
+    fontFamily: FONT_SEMIBOLD,
   },
   title: {
-    fontFamily: 'monospace',
+    fontFamily: FONT_BOLD,
     fontSize: ms(28),
-    fontWeight: 'bold',
     color: palette.primary,
     letterSpacing: 4,
     textShadowColor: palette.primary,
     textShadowRadius: 10,
   },
   subtitle: {
-    fontFamily: 'monospace',
+    fontFamily: FONT_REGULAR,
     fontSize: ms(14),
     color: palette.secondary,
     letterSpacing: 2,
@@ -1228,9 +1230,8 @@ const makeStyles = (palette: any) => StyleSheet.create({
     elevation: s(6),
   },
   timeText: {
-    fontFamily: 'monospace',
+    fontFamily: FONT_BOLD,
     fontSize: ms(40),
-    fontWeight: 'bold',
     letterSpacing: 2,
   },
   progressContainer: {
@@ -1291,15 +1292,14 @@ const makeStyles = (palette: any) => StyleSheet.create({
     gap: vs(6),
   },
   playerMode: {
-    fontFamily: 'monospace',
+    fontFamily: FONT_REGULAR,
     fontSize: ms(12),
     letterSpacing: 2,
     color: palette.text,
   },
   playerTime: {
-    fontFamily: 'monospace',
+    fontFamily: FONT_BOLD,
     fontSize: ms(32),
-    fontWeight: '700',
     letterSpacing: 2,
   },
   playerControlsRow: {
@@ -1348,7 +1348,7 @@ const makeStyles = (palette: any) => StyleSheet.create({
     marginTop: vs(16),
   },
   scoreSectionTitle: {
-    fontFamily: 'Courier New',
+    fontFamily: FONT_SEMIBOLD,
     fontSize: ms(12),
     color: palette.primary,
     letterSpacing: 2,
@@ -1401,10 +1401,9 @@ const makeStyles = (palette: any) => StyleSheet.create({
     alignSelf: 'center',
   },
   scoreLabel: {
-    fontFamily: 'Courier New',
+    fontFamily: FONT_SEMIBOLD,
     fontSize: ms(11),
     color: '#FFFFFF',
-    fontWeight: 'bold',
     letterSpacing: 1,
     textAlign: 'center',
     textTransform: 'uppercase',
@@ -1412,11 +1411,11 @@ const makeStyles = (palette: any) => StyleSheet.create({
     width: '100%',
     paddingHorizontal: s(4),
     marginBottom: vs(4),
+    flexShrink: 1,
   },
   scoreValue: {
-    fontFamily: 'Courier New',
+    fontFamily: FONT_BOLD,
     fontSize: ms(18),
-    fontWeight: 'bold',
     letterSpacing: 1,
     textAlign: 'center',
     marginTop: vs(2),
@@ -1449,21 +1448,19 @@ const makeStyles = (palette: any) => StyleSheet.create({
     marginBottom: vs(10),
   },
   statValue: {
-    fontFamily: 'Courier New',
+    fontFamily: FONT_BOLD,
     fontSize: ms(18),
-    fontWeight: 'bold',
     marginBottom: 4,
   },
   statTitle: {
-    fontFamily: 'Courier New',
+    fontFamily: FONT_SEMIBOLD,
     fontSize: ms(11),
     color: '#FFFFFF',
-    fontWeight: 'bold',
     letterSpacing: 1,
     marginBottom: 4,
   },
   statSubtitle: {
-    fontFamily: 'Courier New',
+    fontFamily: FONT_SEMIBOLD,
     fontSize: ms(10),
     color: '#666699',
     letterSpacing: 0.5,
@@ -1472,9 +1469,8 @@ const makeStyles = (palette: any) => StyleSheet.create({
     marginBottom: vs(20),
   },
   sectionTitle: {
-    fontFamily: 'Courier New',
+    fontFamily: FONT_BOLD,
     fontSize: ms(16),
-    fontWeight: 'bold',
     color: '#00FFFF',
     letterSpacing: 2,
     marginBottom: vs(12),
@@ -1488,16 +1484,14 @@ const makeStyles = (palette: any) => StyleSheet.create({
     marginBottom: vs(6),
   },
   progressLabel: {
-    fontFamily: 'Courier New',
+    fontFamily: FONT_SEMIBOLD,
     fontSize: ms(12),
     color: '#FFFFFF',
-    fontWeight: 'bold',
     letterSpacing: 1,
   },
   progressPercentage: {
-    fontFamily: 'Courier New',
+    fontFamily: FONT_BOLD,
     fontSize: ms(12),
-    fontWeight: 'bold',
   },
   progressBarTrack: {
     height: s(8),
@@ -1512,7 +1506,7 @@ const makeStyles = (palette: any) => StyleSheet.create({
     marginBottom: vs(10),
   },
   achievementCounter: {
-    fontFamily: 'Courier New',
+    fontFamily: FONT_SEMIBOLD,
     fontSize: ms(11),
     color: '#FFFF00',
     letterSpacing: 1,
@@ -1531,13 +1525,12 @@ const makeStyles = (palette: any) => StyleSheet.create({
     gap: vs(4),
   },
   achievementName: {
-    fontFamily: 'Courier New',
+    fontFamily: FONT_BOLD,
     fontSize: ms(12),
-    fontWeight: 'bold',
     letterSpacing: 1,
   },
   achievementDescription: {
-    fontFamily: 'Courier New',
+    fontFamily: FONT_SEMIBOLD,
     fontSize: ms(12),
     lineHeight: ms(16),
     color: '#B8BCFF',
@@ -1548,15 +1541,14 @@ const makeStyles = (palette: any) => StyleSheet.create({
     gap: vs(4),
   },
   achievementProgressText: {
-    fontFamily: 'Courier New',
+    fontFamily: FONT_SEMIBOLD,
     fontSize: ms(11),
     color: '#C3C7FF',
   },
   unlockedText: {
-    fontFamily: 'Courier New',
+    fontFamily: FONT_BOLD,
     fontSize: ms(10),
     color: '#00FF66',
-    fontWeight: 'bold',
     letterSpacing: 1,
   },
   sessionLogContainer: {
@@ -1571,13 +1563,13 @@ const makeStyles = (palette: any) => StyleSheet.create({
     flex: 1,
   },
   sessionLogEntry: {
-    fontFamily: 'monospace',
+    fontFamily: FONT_REGULAR,
     fontSize: ms(11),
     color: '#00FF41',
     marginBottom: vs(4),
   },
   sessionLogEmpty: {
-    fontFamily: 'monospace',
+    fontFamily: FONT_REGULAR,
     fontSize: ms(11),
     color: '#666699',
     textAlign: 'center',
@@ -1599,15 +1591,14 @@ const makeStyles = (palette: any) => StyleSheet.create({
     gap: s(12),
   },
   webDockMode: {
-    fontFamily: 'Courier New',
+    fontFamily: FONT_SEMIBOLD,
     fontSize: ms(12),
     color: '#C3C7FF',
     letterSpacing: 1,
   },
   webDockTime: {
-    fontFamily: 'monospace',
+    fontFamily: FONT_BOLD,
     fontSize: ms(20),
-    fontWeight: '700',
     color: palette.secondary,
     letterSpacing: 1,
   },
@@ -1659,7 +1650,7 @@ const makeStyles = (palette: any) => StyleSheet.create({
     padding: s(16),
   },
   shortcutTitle: {
-    fontFamily: 'Courier New',
+    fontFamily: FONT_SEMIBOLD,
     fontSize: ms(16),
     color: '#00FFFF',
     letterSpacing: 2,
@@ -1667,10 +1658,12 @@ const makeStyles = (palette: any) => StyleSheet.create({
     marginBottom: vs(8),
   },
   shortcutRow: {
-    fontFamily: 'monospace',
+    fontFamily: FONT_REGULAR,
     fontSize: ms(12),
     color: '#C3C7FF',
     marginBottom: vs(4),
   },
 });
+
+
 

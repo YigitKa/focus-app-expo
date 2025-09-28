@@ -14,6 +14,10 @@ import { s, vs, ms } from '@/lib/responsive';
 import { t, resolveLang } from '@/lib/i18n';
 import { usePrefs } from '@/context/PrefsContext';
 import { useTheme } from '@/context/ThemeContext';
+const FONT_REGULAR = 'Poppins-Regular';
+const FONT_MEDIUM = 'Poppins-Medium';
+const FONT_SEMIBOLD = 'Poppins-SemiBold';
+const FONT_BOLD = 'Poppins-Bold';
 
 interface Task {
   id: string;
@@ -166,9 +170,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: s(16),
   },
   title: {
-    fontFamily: 'Courier New',
+    fontFamily: FONT_BOLD,
     fontSize: ms(24),
-    fontWeight: 'bold',
     color: '#00FFFF',
     letterSpacing: 2,
     textShadowColor: 'transparent',
@@ -180,14 +183,14 @@ const styles = StyleSheet.create({
     marginTop: vs(10),
   },
   statText: {
-    fontFamily: 'Courier New',
+    fontFamily: FONT_SEMIBOLD,
     fontSize: ms(12),
     color: '#666699',
     letterSpacing: 0.5,
   },
   statNumber: {
     color: '#FFFF00',
-    fontWeight: 'bold',
+    fontFamily: FONT_BOLD,
   },
   content: {
     flex: 1,
@@ -206,9 +209,8 @@ const styles = StyleSheet.create({
     gap: s(8),
   },
   addButtonText: {
-    fontFamily: 'Courier New',
+    fontFamily: FONT_BOLD,
     fontSize: ms(14),
-    fontWeight: 'bold',
     color: '#00FFFF',
     letterSpacing: 1,
   },
@@ -221,7 +223,7 @@ const styles = StyleSheet.create({
     marginBottom: vs(12),
   },
   taskInput: {
-    fontFamily: 'Courier New',
+    fontFamily: FONT_SEMIBOLD,
     fontSize: ms(14),
     color: '#FFFFFF',
     minHeight: vs(60),
@@ -276,7 +278,7 @@ const styles = StyleSheet.create({
   },
   taskText: {
     flex: 1,
-    fontFamily: 'Courier New',
+    fontFamily: FONT_SEMIBOLD,
     fontSize: ms(14),
     color: '#FFFFFF',
     letterSpacing: 0.5,
@@ -289,3 +291,4 @@ const styles = StyleSheet.create({
     padding: s(4),
   },
 });
+

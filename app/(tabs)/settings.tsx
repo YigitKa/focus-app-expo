@@ -15,6 +15,10 @@ import { usePrefs } from '@/context/PrefsContext';
 import { useSessionStats, DifficultyLevel } from '@/context/SessionStatsContext';
 import { Volume2, VolumeX, Vibrate, Bell, Clock, Settings2 } from 'lucide-react-native';
 import { useTheme } from '@/context/ThemeContext';
+const FONT_REGULAR = 'Poppins-Regular';
+const FONT_MEDIUM = 'Poppins-Medium';
+const FONT_SEMIBOLD = 'Poppins-SemiBold';
+const FONT_BOLD = 'Poppins-Bold';
 
 export default function SettingsScreen() {
   const { prefs, updatePrefs } = usePrefs();
@@ -338,16 +342,15 @@ const styles = StyleSheet.create({
     paddingVertical: vs(16),
   },
   title: {
-    fontFamily: 'Courier New',
+    fontFamily: FONT_BOLD,
     fontSize: ms(22),
-    fontWeight: 'bold',
     color: '#00FF66',
     letterSpacing: 2,
     textShadowColor: 'transparent',
     textShadowRadius: 0,
   },
   subtitle: {
-    fontFamily: 'Courier New',
+    fontFamily: FONT_SEMIBOLD,
     fontSize: ms(12),
     color: '#666699',
     letterSpacing: 1,
@@ -361,9 +364,8 @@ const styles = StyleSheet.create({
     marginBottom: vs(20),
   },
   sectionTitle: {
-    fontFamily: 'Courier New',
+    fontFamily: FONT_BOLD,
     fontSize: ms(14),
-    fontWeight: 'bold',
     color: '#FF00FF',
     letterSpacing: 1,
     marginBottom: vs(12),
@@ -385,13 +387,13 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,255,255,0.12)',
   },
   langText: {
-    fontFamily: 'Courier New',
+    fontFamily: FONT_SEMIBOLD,
     fontSize: ms(12),
     color: '#888899',
   },
   langTextActive: {
     color: '#00FFFF',
-    fontWeight: 'bold',
+    fontFamily: FONT_SEMIBOLD,
   },
   difficultyRow: {
     flexDirection: 'row',
@@ -412,14 +414,14 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,255,255,0.15)',
   },
   difficultyText: {
-    fontFamily: 'Courier New',
+    fontFamily: FONT_SEMIBOLD,
     fontSize: ms(12),
     color: '#C3C7FF',
     letterSpacing: 1,
   },
   difficultyTextActive: {
     color: '#00FFFF',
-    fontWeight: 'bold',
+    fontFamily: FONT_SEMIBOLD,
   },
   resetButton: {
     marginTop: vs(16),
@@ -431,14 +433,13 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,0,255,0.12)',
   },
   resetButtonText: {
-    fontFamily: 'Courier New',
+    fontFamily: FONT_BOLD,
     fontSize: ms(12),
-    fontWeight: 'bold',
     color: '#FF00FF',
     letterSpacing: 1,
   },
   resetHint: {
-    fontFamily: 'Courier New',
+    fontFamily: FONT_SEMIBOLD,
     fontSize: ms(10),
     color: '#666699',
     marginTop: vs(8),
@@ -462,14 +463,13 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   settingTitle: {
-    fontFamily: 'Courier New',
+    fontFamily: FONT_BOLD,
     fontSize: ms(12),
-    fontWeight: 'bold',
     color: '#FFFFFF',
     letterSpacing: 1,
   },
   settingSubtitle: {
-    fontFamily: 'Courier New',
+    fontFamily: FONT_SEMIBOLD,
     fontSize: ms(11),
     color: '#888899',
     marginTop: 4,
@@ -486,10 +486,9 @@ const styles = StyleSheet.create({
     paddingVertical: s(6),
   },
   valueText: {
-    fontFamily: 'Courier New',
+    fontFamily: FONT_BOLD,
     fontSize: ms(12),
     color: '#00FFFF',
-    fontWeight: 'bold',
   },
   timerSetting: {
     backgroundColor: 'rgba(255,255,255,0.05)',
@@ -500,9 +499,8 @@ const styles = StyleSheet.create({
     marginBottom: vs(10),
   },
   timerTitle: {
-    fontFamily: 'Courier New',
+    fontFamily: FONT_BOLD,
     fontSize: ms(12),
-    fontWeight: 'bold',
     color: '#FFFFFF',
     letterSpacing: 1,
     marginBottom: vs(8),
@@ -523,15 +521,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   timerButtonText: {
-    fontFamily: 'Courier New',
+    fontFamily: FONT_BOLD,
     fontSize: ms(18),
-    fontWeight: 'bold',
     color: '#FF00FF',
   },
   timerValue: {
-    fontFamily: 'Courier New',
+    fontFamily: FONT_BOLD,
     fontSize: ms(16),
-    fontWeight: 'bold',
     color: '#FFFF00',
     letterSpacing: 1,
   },
@@ -544,16 +540,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   aboutTitle: {
-    fontFamily: 'Courier New',
+    fontFamily: FONT_BOLD,
     fontSize: ms(16),
-    fontWeight: 'bold',
     color: '#00FFFF',
     letterSpacing: 2,
     marginTop: vs(10),
     marginBottom: vs(8),
   },
   aboutText: {
-    fontFamily: 'Courier New',
+    fontFamily: FONT_SEMIBOLD,
     fontSize: ms(12),
     color: '#FFFFFF',
     textAlign: 'center',
@@ -561,9 +556,11 @@ const styles = StyleSheet.create({
     marginBottom: vs(10),
   },
   aboutSubtext: {
-    fontFamily: 'Courier New',
+    fontFamily: FONT_REGULAR,
     fontSize: ms(11),
     color: '#666699',
     letterSpacing: 1,
   },
 });
+
+

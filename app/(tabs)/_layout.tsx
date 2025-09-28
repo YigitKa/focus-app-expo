@@ -31,9 +31,8 @@ export default function TabLayout() {
         tabBarActiveTintColor: palette.primary,
         tabBarInactiveTintColor: '#666699',
         tabBarLabelStyle: {
-          fontFamily: 'Courier New',
+          fontFamily: FONT_SEMIBOLD,
           fontSize: Math.max(13, labelSize),
-          fontWeight: 'bold',
           letterSpacing: 1,
         },
         tabBarItemStyle: { paddingVertical: 4 },
@@ -69,3 +68,4 @@ export default function TabLayout() {
     </Tabs>
   );
 }
+
