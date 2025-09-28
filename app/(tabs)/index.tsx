@@ -366,7 +366,15 @@ const TimerScreen = () => {
             ]}
           >
             <View style={styles.scoreIcon}>{item.icon}</View>
-            <Text style={styles.scoreLabel} numberOfLines={1} ellipsizeMode="tail">{item.label}</Text>
+            <Text
+              style={styles.scoreLabel}
+              numberOfLines={2}
+              ellipsizeMode="tail"
+              adjustsFontSizeToFit
+              minimumFontScale={0.85}
+            >
+              {item.label}
+            </Text>
             <Text style={[
               styles.scoreValue,
               {
@@ -1370,14 +1378,18 @@ const makeStyles = (palette: any) => StyleSheet.create({
     fontSize: ms(11),
     color: palette.text,
     letterSpacing: 1,
-    textAlign: 'right',
+    textAlign: 'center',
+    alignSelf: 'stretch',
+    paddingHorizontal: s(4),
   },
   scoreValue: {
     fontFamily: 'monospace',
     fontSize: ms(20),
     fontWeight: '700',
     letterSpacing: 1,
-    textAlign: 'right',
+    textAlign: 'center',
+    alignSelf: 'stretch',
+    paddingHorizontal: s(4),
   },
   content: {
     paddingHorizontal: s(16),
@@ -1629,3 +1641,5 @@ const makeStyles = (palette: any) => StyleSheet.create({
     marginBottom: vs(4),
   },
 });
+
+
