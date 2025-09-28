@@ -453,8 +453,7 @@ const TimerScreen = () => {
       <View style={[
         styles.statCard,
         { borderColor: color },
-        // Use percentage-based grid to avoid overflow/misalignment on web
-        { flexBasis: '48%', maxWidth: '48%' },
+        { flex: 1, minWidth: 150 },
       ]}>
         <View style={[styles.iconContainer, { backgroundColor: `${color}20` }]}> 
           {icon}
@@ -1142,7 +1141,7 @@ const makeStyles = (palette: any) => StyleSheet.create({
     flexGrow: 1,
     flexBasis: '24%',
     maxWidth: '24%',
-    minWidth: s(120),
+    minWidth: s(90),
   },
   presetButtonCompact: {
     paddingVertical: s(6),
@@ -1386,7 +1385,6 @@ const makeStyles = (palette: any) => StyleSheet.create({
   statsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    justifyContent: 'space-between',
     gap: s(12),
     marginBottom: vs(20),
   },

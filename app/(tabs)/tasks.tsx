@@ -234,9 +234,9 @@ const styles = StyleSheet.create({
     marginTop: vs(8),
   },
   actionButton: {
-    width: s(36),
-    height: s(36),
-    borderRadius: s(18),
+    width: ms(36),
+    height: ms(36),
+    borderRadius: ms(18),
     backgroundColor: 'rgba(255,255,255,0.1)',
     alignItems: 'center',
     justifyContent: 'center',
@@ -262,8 +262,8 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,255,102,0.1)',
   },
   checkbox: {
-    width: s(22),
-    height: s(22),
+    width: ms(22),
+    height: ms(22),
     borderWidth: 2,
     borderColor: '#00FFFF',
     borderRadius: 4,
