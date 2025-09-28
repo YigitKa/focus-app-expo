@@ -4,6 +4,7 @@ import { Timer, SquareCheck as CheckSquare, ChartBar as BarChart3, Settings } fr
 import { s, msc, clamp } from '@/lib/responsive';
 import { t, resolveLang } from '@/lib/i18n';
 import { usePrefs } from '@/context/PrefsContext';
+import { useTheme } from '@/context/ThemeContext';
 
 export default function TabLayout() {
   const { width } = useWindowDimensions();
@@ -13,19 +14,21 @@ export default function TabLayout() {
   const labelSize = msc(isTablet ? 12 : 11, 10, 12);
   const { prefs } = usePrefs();
   const uiLang = resolveLang(prefs.language);
+  const { theme } = useTheme();
+  const palette = theme.colors;
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
         tabBarStyle: {
-          backgroundColor: '#000011',
-          borderTopColor: '#FF00FF',
+          backgroundColor: palette.background,
+          borderTopColor: palette.secondary,
           borderTopWidth: 2,
           height: tabHeight,
           paddingBottom: tabPaddingV,
           paddingTop: tabPaddingV,
         },
-        tabBarActiveTintColor: '#00FFFF',
+        tabBarActiveTintColor: palette.primary,
         tabBarInactiveTintColor: '#666699',
         tabBarLabelStyle: {
           fontFamily: 'Courier New',

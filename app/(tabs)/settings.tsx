@@ -14,11 +14,14 @@ import { t, resolveLang } from '@/lib/i18n';
 import { usePrefs } from '@/context/PrefsContext';
 import { useSessionStats, DifficultyLevel } from '@/context/SessionStatsContext';
 import { Volume2, VolumeX, Vibrate, Bell, Clock, Settings2 } from 'lucide-react-native';
+import { useTheme } from '@/context/ThemeContext';
 
 export default function SettingsScreen() {
   const { prefs, updatePrefs } = usePrefs();
   const { difficulty, setAchievementDifficulty, resetStats } = useSessionStats();
   const uiLang = resolveLang(prefs.language);
+  const { theme, name: themeName, setThemeName } = useTheme();
+  const palette = theme.colors;
   const difficultyOptions: DifficultyLevel[] = ['easy', 'normal', 'hard'];
   const [settings, setSettings] = useState({
     soundEnabled: true,
@@ -130,12 +133,12 @@ export default function SettingsScreen() {
   );
 
   return (
-    <LinearGradient colors={['#000011', '#001122', '#000033']} style={styles.container}>
+    <LinearGradient colors={theme.gradient} style={[styles.container, { backgroundColor: palette.background }]}>
       <View style={styles.gridOverlay} />
       
       <View style={styles.header}>
-        <Text style={styles.title}>{t('settings.title', uiLang)}</Text>
-        <Text style={styles.subtitle}>{t('settings.subtitle', uiLang)}</Text>
+        <Text style={[styles.title, { color: palette.success }]}>{t('settings.title', uiLang)}</Text>
+        <Text style={[styles.subtitle, { color: palette.text }]}>{t('settings.subtitle', uiLang)}</Text>
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
@@ -287,6 +290,23 @@ export default function SettingsScreen() {
         </View>
 
         <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Tema</Text>
+          <View style={styles.languageRow}>
+            {(['nova','retro'] as const).map(opt => (
+              <TouchableOpacity
+                key={opt}
+                onPress={() => setThemeName(opt)}
+                style={[styles.langPill, themeName === opt && styles.langPillActive]}
+              >
+                <Text style={[styles.langText, themeName === opt && styles.langTextActive]}>
+                  {opt === 'nova' ? 'Modern' : 'Retro'}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+
+        <View style={styles.section}>
           <Text style={styles.sectionTitle}>{t('settings.about', uiLang)}</Text>
           
           <View style={styles.aboutCard}>
@@ -322,9 +342,9 @@ const styles = StyleSheet.create({
     fontSize: ms(22),
     fontWeight: 'bold',
     color: '#00FF66',
-    letterSpacing: 3,
-    textShadowColor: '#00FF66',
-    textShadowRadius: 8,
+    letterSpacing: 2,
+    textShadowColor: 'transparent',
+    textShadowRadius: 0,
   },
   subtitle: {
     fontFamily: 'Courier New',
@@ -345,7 +365,7 @@ const styles = StyleSheet.create({
     fontSize: ms(14),
     fontWeight: 'bold',
     color: '#FF00FF',
-    letterSpacing: 2,
+    letterSpacing: 1,
     marginBottom: vs(12),
   },
   languageRow: {

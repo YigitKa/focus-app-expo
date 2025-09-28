@@ -27,30 +27,21 @@ import { s, vs, ms, clamp, msc } from '@/lib/responsive';
 import { t, resolveLang } from '@/lib/i18n';
 import { usePrefs } from '@/context/PrefsContext';
 import { useSessionStats, AchievementId, CompletedSession } from '@/context/SessionStatsContext';
+import { useRouter } from 'expo-router';
+import { useTheme } from '@/context/ThemeContext';
 
 type Mode = 'work' | 'short' | 'long' | 'free';
 type ScoreItem = { key: string; label: string; value: string; emphasis?: boolean; icon: React.ReactNode };
-
-const palette = {
-  primary: '#00FFFF', // Cyan
-  secondary: '#FF00FF', // Magenta
-  accent: '#FFFF00', // Yellow
-  background: '#000011',
-  background2: '#001122',
-  background3: '#000033',
-  text: '#C3C7FF',
-  textEmphasis: '#FFFFFF',
-  border: '#333366',
-  borderActive: '#00FFFF',
-  success: '#00FF66',
-  warning: '#FFA500',
-};
 
 const TimerScreen = () => {
   const { width: winW, height: winH } = useWindowDimensions();
   const { prefs } = usePrefs();
   const uiLang = resolveLang(prefs.language);
   const { stats: sessionStats, recordSession, achievementStates, difficulty } = useSessionStats();
+  const router = useRouter();
+  const { theme } = useTheme();
+  const palette = theme.colors;
+  const styles = makeStyles(palette);
   const totals = sessionStats.totals;
   const totalScore = sessionStats.totalScore;
   const focusSeconds = sessionStats.focusSeconds;
@@ -147,6 +138,7 @@ const TimerScreen = () => {
   const isPortrait = !isLandscape;
   const isCompact = isPortrait ? winW < 420 : winH < 540 || winW < 640;
   const isWeb = Platform.OS === 'web';
+  const webDockHeight = 56; // sticky pro bar height on web
   const usePlayerLayout = isLandscape;
   // Make the ring smaller while enlarging time text later
   const circleSize = clamp(
@@ -294,7 +286,8 @@ const TimerScreen = () => {
       onPress={() => handlePresetPress(key)}
       style={[
         styles.presetButton,
-        { width: presetWidth },
+        // Equal-width grid when not using the horizontal scroller
+        useScrollPresets ? { width: presetWidth } : styles.presetButtonEqual,
         isCompact && styles.presetButtonCompact,
         mode === key && styles.presetActive,
       ]}
@@ -310,6 +303,36 @@ const TimerScreen = () => {
       </Text>
     </TouchableOpacity>
   ));
+  const [showShortcuts, setShowShortcuts] = useState(false);
+
+  // Keyboard shortcuts for web (experienced use)
+  useEffect(() => {
+    if (!isWeb) return;
+    const onKeyDown = (ev: any) => {
+      const key = (ev?.key || '').toLowerCase();
+      const tag = (ev?.target?.tagName || '').toLowerCase();
+      const editable = tag === 'input' || tag === 'textarea' || tag === 'select' || ev?.target?.isContentEditable;
+      if (editable) return; // don't hijack typing
+
+      // Navigation
+      if (key === 's') { router.push('/(tabs)/settings'); return; }
+      if (key === 't') { router.push('/(tabs)/tasks'); return; }
+      if (key === '?') { setShowShortcuts(prev => !prev); return; }
+
+      // Timer controls
+      if (key === ' ') { ev.preventDefault(); toggleTimer(); return; }
+      if (key === 'k') { ev.preventDefault(); toggleTimer(); return; }
+      if (key === 'r') { ev.preventDefault(); resetTimer(); return; }
+      if (key === '1') { handlePresetPress('work'); return; }
+      if (key === '2') { handlePresetPress('short'); return; }
+      if (key === '3') { handlePresetPress('long'); return; }
+      if (key === '4') { handlePresetPress('free'); return; }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [isWeb, router, toggleTimer, resetTimer, handlePresetPress]);
+
+  // Shortcuts help overlay state handled above
 
   // Fixed 4x2 grid for the scoreboard
   const portraitColumns = 4;
@@ -343,7 +366,7 @@ const TimerScreen = () => {
             ]}
           >
             <View style={styles.scoreIcon}>{item.icon}</View>
-            <Text style={styles.scoreLabel}>{item.label}</Text>
+            <Text style={styles.scoreLabel} numberOfLines={1} ellipsizeMode="tail">{item.label}</Text>
             <Text style={[
               styles.scoreValue,
               {
@@ -427,8 +450,13 @@ const TimerScreen = () => {
       subtitle: string;
       color?: string;
     }) => (
-      <View style={[styles.statCard, { borderColor: color, width: (winW - s(50)) / 2 }] }>
-        <View style={[styles.iconContainer, { backgroundColor: `${color}20` }]}>
+      <View style={[
+        styles.statCard,
+        { borderColor: color },
+        // Use percentage-based grid to avoid overflow/misalignment on web
+        { flexBasis: '48%', maxWidth: '48%' },
+      ]}>
+        <View style={[styles.iconContainer, { backgroundColor: `${color}20` }]}> 
           {icon}
         </View>
         <Text style={[styles.statValue, { color }]}>{value}</Text>
@@ -623,7 +651,7 @@ const TimerScreen = () => {
 
   return (
     <LinearGradient
-      colors={[palette.background, palette.background2, palette.background3]}
+      colors={theme.gradient}
       style={[
         styles.container,
         usePlayerLayout ? styles.landscapeContainer : styles.portraitContainer,
@@ -632,11 +660,49 @@ const TimerScreen = () => {
     >
       <View style={styles.gridOverlay} />
       {isWeb ? (
+        <>
+          {/* Sticky pro bar for web */}
+          <View
+            style={[
+              styles.webDock,
+              { height: webDockHeight },
+            ]}
+          >
+            <Text style={styles.webDockMode}>{mode === 'work' ? t('settings.work', uiLang) : mode === 'short' ? t('settings.shortBreak', uiLang) : mode === 'long' ? t('settings.longBreak', uiLang) : t('settings.freeFocus', uiLang)}</Text>
+            <Text style={styles.webDockTime}>{formatTime(timeLeft)}</Text>
+            <View style={styles.webDockControls}>
+              <TouchableOpacity
+                accessibilityLabel="Play/Pause (Space or K)"
+                onPress={toggleTimer}
+                style={[styles.webDockBtn, { cursor: 'pointer' } as any]}
+              >
+                {isActive ? (
+                  <Pause size={18} color={palette.primary} strokeWidth={2} />
+                ) : (
+                  <Play size={18} color={palette.primary} strokeWidth={2} />
+                )}
+              </TouchableOpacity>
+              <TouchableOpacity
+                accessibilityLabel="Reset (R)"
+                onPress={resetTimer}
+                style={[styles.webDockBtn, { cursor: 'pointer' } as any]}
+              >
+                <RotateCcw size={18} color={palette.primary} strokeWidth={2} />
+              </TouchableOpacity>
+            </View>
+            <View style={styles.webDockProgressBar}>
+              <Animated.View
+                style={[styles.webDockProgressFill, { width: `${progress}%`, backgroundColor: isBreak ? palette.accent : palette.secondary }]}
+              />
+            </View>
+          </View>
+          {/* Main scrollable content (offset for dock) */}
         <ScrollView
           style={styles.webScroll}
-          contentContainerStyle={styles.webScrollContent}
+          contentContainerStyle={[styles.webScrollContent, { paddingTop: webDockHeight + vs(8) }]}
           showsVerticalScrollIndicator={true}
         >
+          <View style={{ height: 0 }} />
           <View style={[styles.header, isCompact && styles.headerCompact, usePlayerLayout && styles.headerLandscape]}>
             <Text style={[styles.title, { fontSize: titleSize }]}>{t('timer.heading', uiLang)}</Text>
             <Text style={[styles.subtitle, { fontSize: subtitleSize }]}>
@@ -785,6 +851,22 @@ const TimerScreen = () => {
           )}
           <StatsSection />
         </ScrollView>
+        {/* Shortcuts overlay */}
+        {showShortcuts && (
+          <View style={styles.shortcutOverlay}>
+            <View style={styles.shortcutCard}>
+              <Text style={styles.shortcutTitle}>Shortcuts</Text>
+              <Text style={styles.shortcutRow}>Space / K — Play or Pause</Text>
+              <Text style={styles.shortcutRow}>R — Reset timer</Text>
+              <Text style={styles.shortcutRow}>1 / 2 / 3 / 4 — Work / Short / Long / Free</Text>
+              <Text style={styles.shortcutRow}>S — Settings, T — Tasks, ? — Toggle help</Text>
+              <TouchableOpacity onPress={() => setShowShortcuts(false)} style={[styles.webDockBtn, { alignSelf: 'center', marginTop: vs(10) }]}>
+                <Text style={{ color: palette.primary, fontFamily: 'Courier New' }}>Close</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+        </>
       ) : (
         <ScrollView>
           <View style={[styles.header, isCompact && styles.headerCompact, usePlayerLayout && styles.headerLandscape]}>
@@ -943,7 +1025,7 @@ const TimerScreen = () => {
 
 export default TimerScreen;
 
-const styles = StyleSheet.create({
+const makeStyles = (palette: any) => StyleSheet.create({
   container: {
     flex: 1,
   },
@@ -1037,7 +1119,7 @@ const styles = StyleSheet.create({
   },
   presetRow: {
     flexDirection: 'row',
-    justifyContent: 'center',
+    justifyContent: 'space-between',
     flexWrap: 'wrap',
     gap: s(6),
     marginTop: vs(6),
@@ -1054,6 +1136,13 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.08)',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  // Equal-width preset buttons for wide screens (web/tablet)
+  presetButtonEqual: {
+    flexGrow: 1,
+    flexBasis: '24%',
+    maxWidth: '24%',
+    minWidth: s(120),
   },
   presetButtonCompact: {
     paddingVertical: s(6),
@@ -1298,6 +1387,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
+    gap: s(12),
     marginBottom: vs(20),
   },
   statCard: {
@@ -1406,8 +1496,10 @@ const styles = StyleSheet.create({
   },
   achievementDescription: {
     fontFamily: 'Courier New',
-    fontSize: ms(11),
-    color: '#888899',
+    fontSize: ms(12),
+    lineHeight: ms(16),
+    color: '#B8BCFF',
+    letterSpacing: 0.5,
   },
   achievementProgress: {
     alignItems: 'flex-end',
@@ -1447,5 +1539,95 @@ const styles = StyleSheet.create({
     fontSize: ms(11),
     color: '#666699',
     textAlign: 'center',
+  },
+  // Web pro dock (sticky header)
+  webDock: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 1000,
+    backgroundColor: 'rgba(0,0,20,0.9)',
+    borderBottomColor: '#FF00FF',
+    borderBottomWidth: 2,
+    paddingHorizontal: s(12),
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: s(12),
+  },
+  webDockMode: {
+    fontFamily: 'Courier New',
+    fontSize: ms(12),
+    color: '#C3C7FF',
+    letterSpacing: 1,
+  },
+  webDockTime: {
+    fontFamily: 'monospace',
+    fontSize: ms(20),
+    fontWeight: '700',
+    color: palette.secondary,
+    letterSpacing: 1,
+  },
+  webDockControls: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: s(8),
+  },
+  webDockBtn: {
+    width: s(32),
+    height: s(32),
+    borderRadius: s(16),
+    borderWidth: 2,
+    borderColor: palette.primary,
+    backgroundColor: 'rgba(0,255,255,0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  webDockProgressBar: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: 3,
+    backgroundColor: '#222244',
+  },
+  webDockProgressFill: {
+    height: '100%',
+  },
+  // Shortcuts overlay
+  shortcutOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 1100,
+  },
+  shortcutCard: {
+    width: '90%',
+    maxWidth: 520,
+    backgroundColor: 'rgba(0,0,50,0.95)',
+    borderWidth: 1,
+    borderColor: '#333366',
+    borderRadius: 12,
+    padding: s(16),
+  },
+  shortcutTitle: {
+    fontFamily: 'Courier New',
+    fontSize: ms(16),
+    color: '#00FFFF',
+    letterSpacing: 2,
+    textAlign: 'center',
+    marginBottom: vs(8),
+  },
+  shortcutRow: {
+    fontFamily: 'monospace',
+    fontSize: ms(12),
+    color: '#C3C7FF',
+    marginBottom: vs(4),
   },
 });

@@ -13,6 +13,7 @@ import { Plus, Check, X } from 'lucide-react-native';
 import { s, vs, ms } from '@/lib/responsive';
 import { t, resolveLang } from '@/lib/i18n';
 import { usePrefs } from '@/context/PrefsContext';
+import { useTheme } from '@/context/ThemeContext';
 
 interface Task {
   id: string;
@@ -24,6 +25,8 @@ interface Task {
 export default function TasksScreen() {
   const { prefs } = usePrefs();
   const uiLang = resolveLang(prefs.language);
+  const { theme } = useTheme();
+  const palette = theme.colors;
   const [tasks, setTasks] = useState<Task[]>([]);
   const [newTaskText, setNewTaskText] = useState('');
   const [isAddingTask, setIsAddingTask] = useState(false);
@@ -79,17 +82,17 @@ export default function TasksScreen() {
   );
 
   return (
-    <LinearGradient colors={['#000011', '#001122', '#000033']} style={styles.container}>
+    <LinearGradient colors={theme.gradient} style={[styles.container, { backgroundColor: palette.background }]}>
       <View style={styles.gridOverlay} />
       
       <View style={styles.header}>
-        <Text style={styles.title}>{t('tasks.title', uiLang)}</Text>
+        <Text style={[styles.title, { color: palette.primary }]}>{t('tasks.title', uiLang)}</Text>
         <View style={styles.statsContainer}>
-          <Text style={styles.statText}>
-            {t('tasks.completed', uiLang)}: <Text style={styles.statNumber}>{completedCount}</Text>
+          <Text style={[styles.statText, { color: palette.text }]}>
+            {t('tasks.completed', uiLang)}: <Text style={[styles.statNumber, { color: palette.accent }]}>{completedCount}</Text>
           </Text>
-          <Text style={styles.statText}>
-            {t('tasks.total', uiLang)}: <Text style={styles.statNumber}>{tasks.length}</Text>
+          <Text style={[styles.statText, { color: palette.text }]}>
+            {t('tasks.total', uiLang)}: <Text style={[styles.statNumber, { color: palette.accent }]}>{tasks.length}</Text>
           </Text>
         </View>
       </View>
@@ -124,11 +127,11 @@ export default function TasksScreen() {
           </View>
         ) : (
           <TouchableOpacity
-            style={styles.addButton}
+            style={[styles.addButton, { borderColor: palette.primary, backgroundColor: 'rgba(0,255,255,0.1)' }]}
             onPress={() => setIsAddingTask(true)}
           >
-            <Plus size={ms(20)} color="#00FFFF" strokeWidth={2} />
-            <Text style={styles.addButtonText}>{t('tasks.addNew', uiLang)}</Text>
+            <Plus size={ms(20)} color={palette.primary} strokeWidth={2} />
+            <Text style={[styles.addButtonText, { color: palette.primary }]}>{t('tasks.addNew', uiLang)}</Text>
           </TouchableOpacity>
         )}
 
@@ -167,9 +170,9 @@ const styles = StyleSheet.create({
     fontSize: ms(24),
     fontWeight: 'bold',
     color: '#00FFFF',
-    letterSpacing: 3,
-    textShadowColor: '#00FFFF',
-    textShadowRadius: 8,
+    letterSpacing: 2,
+    textShadowColor: 'transparent',
+    textShadowRadius: 0,
   },
   statsContainer: {
     flexDirection: 'row',
@@ -180,7 +183,7 @@ const styles = StyleSheet.create({
     fontFamily: 'Courier New',
     fontSize: ms(12),
     color: '#666699',
-    letterSpacing: 1,
+    letterSpacing: 0.5,
   },
   statNumber: {
     color: '#FFFF00',

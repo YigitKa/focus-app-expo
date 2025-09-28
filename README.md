@@ -29,6 +29,8 @@ Feature Highlights
 - Settings Suite: Language switcher (system/English/Turkce), timer duration controls, audiovisual toggles, difficulty picker, and a guarded "Reset Stats" action.
 - Multi-language Support: English and Turkish strings managed through a simple dictionary in `lib/i18n.ts`.
 - Responsive Layout: Shared responsive helpers (`s`, `vs`, `ms`, `msc`, `clamp`) keep components proportionate on phones, tablets, and the web.
+- Web Pro Bar: A sticky top bar on web shows time, mode and quick controls. Global keyboard shortcuts speed up expert workflows.
+ - Themes: Modern “Nova” theme for higher readability and a classic “Retro” theme. Switch in Settings.
 
 Screens at a Glance
 -------------------
@@ -84,3 +86,11 @@ Roadmap / Ideas
 License
 -------
 Retro Focus is distributed under the [Creative Commons Attribution-NonCommercial 4.0 International](LICENSE) license. You may use, remix, and share the project for non-commercial purposes so long as you provide attribution. Contact the authors if you need a commercial license or alternative terms.
+
+Web Shortcuts (Desktop)
+-----------------------
+- Space / K — Play or pause
+- R — Reset timer
+- 1 / 2 / 3 / 4 — Work / Short / Long / Free
+- S — Settings, T — Tasks
+- ? — Toggle the shortcuts help overlay
