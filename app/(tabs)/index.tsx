@@ -140,6 +140,7 @@ const TimerScreen = () => {
   const isWeb = Platform.OS === 'web';
   const webDockHeight = 56; // sticky pro bar height on web
   const usePlayerLayout = isLandscape;
+  const baseTitleRef = useRef<string | null>(null);
   // Make the ring smaller while enlarging time text later
   const circleSize = clamp(
     base * (isCompact && isPortrait ? 0.36 : 0.44),
@@ -332,6 +333,26 @@ const TimerScreen = () => {
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [isWeb, router, toggleTimer, resetTimer, handlePresetPress]);
 
+  useEffect(() => {
+    if (!isWeb || typeof document === 'undefined') return;
+    if (!baseTitleRef.current) {
+      baseTitleRef.current = document.title || 'Retro Odak';
+    }
+    return () => {
+      if (baseTitleRef.current) {
+        document.title = baseTitleRef.current;
+      }
+    };
+  }, [isWeb]);
+
+  useEffect(() => {
+    if (!isWeb || typeof document === 'undefined') return;
+    const baseTitle = baseTitleRef.current || 'Retro Odak';
+    const statusLabel = isBreak ? t('timer.break', uiLang) : t('timer.focus', uiLang);
+    const formattedRemaining = formatTime(Math.max(0, timeLeft));
+    document.title = `${formattedRemaining} - ${statusLabel} - ${baseTitle}`;
+  }, [isWeb, timeLeft, isBreak, uiLang]);
+
   // Shortcuts help overlay state handled above
 
   // Fixed 4x2 grid for the scoreboard
@@ -354,42 +375,43 @@ const TimerScreen = () => {
           variant === 'landscape' ? styles.scoreBoardLandscape : styles.scoreBoardPortrait,
         ]}
       >
-        {scoreItems.map(item => (
-          <View
-            key={item.key}
-            style={[
-              styles.scoreItem,
-              variant === 'landscape' && styles.scoreItemLandscape,
-              // On wide web portrait, show smaller side-by-side tiles
-              { flexBasis: portraitBasis, maxWidth: portraitBasis },
-              item.emphasis && styles.scoreItemEmphasis,
-            ]}
-          >
-            <View style={styles.scoreIcon}>{item.icon}</View>
-            <Text
-              style={styles.scoreLabel}
-              numberOfLines={2}
-              ellipsizeMode="tail"
-              adjustsFontSizeToFit
-              minimumFontScale={0.85}
+        {scoreItems.map(item => {
+          const accentColor =
+            item.key === 'work' ? palette.secondary :
+            item.key === 'short' ? palette.primary :
+            item.key === 'long' ? palette.success :
+            item.key === 'sessions' ? palette.primary :
+            item.key === 'focus' ? palette.secondary :
+            item.key === 'streak' ? palette.accent :
+            item.key === 'combo' ? palette.warning :
+            palette.warning;
+          const tileBackground = accentColor.endsWith(')') ? accentColor : `${accentColor}22`;
+          return (
+            <View
+              key={item.key}
+              style={[
+                styles.scoreItem,
+                variant === 'landscape' && styles.scoreItemLandscape,
+                { flexBasis: portraitBasis, maxWidth: portraitBasis },
+                item.emphasis && styles.scoreItemEmphasis,
+                { borderColor: accentColor },
+              ]}
             >
-              {item.label}
-            </Text>
-            <Text style={[
-              styles.scoreValue,
-              {
-                color:
-                  item.key === 'work' ? palette.secondary :
-                  item.key === 'short' ? palette.primary :
-                  item.key === 'long' ? palette.success :
-                  item.key === 'streak' ? palette.accent :
-                  item.key === 'combo' ? palette.warning :
-                  palette.warning,
-              },
-            ]}
-            >{item.value}</Text>
-          </View>
-        ))}
+              <View style={[styles.scoreIcon, { backgroundColor: tileBackground }]}>{item.icon}</View>
+              <Text
+                style={styles.scoreLabel}
+                numberOfLines={2}
+                ellipsizeMode="tail"
+                adjustsFontSizeToFit
+                minimumFontScale={0.65}
+              >
+                {item.label}
+              </Text>
+              <Text style={[styles.scoreValue, { color: accentColor }]}>{item.value}</Text>
+            </View>
+          );
+        })}
+
       </View>
     </View>
   );
@@ -1338,7 +1360,7 @@ const makeStyles = (palette: any) => StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
-    gap: s(12),
+    gap: s(6),
   },
   scoreBoardPortrait: {
     justifyContent: 'space-between',
@@ -1350,14 +1372,16 @@ const makeStyles = (palette: any) => StyleSheet.create({
     flexGrow: 1,
     flexBasis: '48%',
     minWidth: 0,
-    borderWidth: 1,
-    borderColor: 'rgba(0,255,255,0.3)',
-    backgroundColor: 'rgba(0,0,50,0.35)',
+    minHeight: vs(120),
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.1)',
     borderRadius: 12,
-    paddingVertical: vs(8),
-    paddingHorizontal: s(8),
-    alignItems: 'stretch',
-    gap: vs(6),
+    padding: s(12),
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: vs(8),
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    alignSelf: 'stretch',
   },
   scoreItemLandscape: {
     flexBasis: '23%',
@@ -1368,28 +1392,36 @@ const makeStyles = (palette: any) => StyleSheet.create({
     backgroundColor: 'rgba(255,255,0,0.12)',
   },
   scoreIcon: {
-    marginBottom: vs(2),
+    width: s(54),
+    height: s(54),
+    borderRadius: s(27),
     alignItems: 'center',
     justifyContent: 'center',
+    marginBottom: vs(10),
     alignSelf: 'center',
   },
   scoreLabel: {
-    fontFamily: 'monospace',
+    fontFamily: 'Courier New',
     fontSize: ms(11),
-    color: palette.text,
+    color: '#FFFFFF',
+    fontWeight: 'bold',
     letterSpacing: 1,
     textAlign: 'center',
+    textTransform: 'uppercase',
     alignSelf: 'stretch',
+    width: '100%',
     paddingHorizontal: s(4),
+    marginBottom: vs(4),
   },
   scoreValue: {
-    fontFamily: 'monospace',
-    fontSize: ms(20),
-    fontWeight: '700',
+    fontFamily: 'Courier New',
+    fontSize: ms(18),
+    fontWeight: 'bold',
     letterSpacing: 1,
     textAlign: 'center',
+    marginTop: vs(2),
     alignSelf: 'stretch',
-    paddingHorizontal: s(4),
+    width: '100%',
   },
   content: {
     paddingHorizontal: s(16),
@@ -1641,5 +1673,4 @@ const makeStyles = (palette: any) => StyleSheet.create({
     marginBottom: vs(4),
   },
 });
-
 
