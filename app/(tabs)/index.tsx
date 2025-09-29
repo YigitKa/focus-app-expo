@@ -70,12 +70,14 @@ const PomodoroProgressBar = ({
     <View style={styles.pomodoroBar}>
       {phases.map((phase, i) => {
         const isActive = i === currentPhaseIndex;
-        const glowStyle = isActive ? {
+        const activeStyle = isActive ? {
           shadowColor: phase.color,
           shadowOffset: { width: 0, height: 0 },
           shadowOpacity: 1,
           shadowRadius: 8,
-          elevation: 5, // For Android
+          elevation: 8,
+          borderWidth: 2,
+          borderColor: '#FFFFFF',
         } : {};
 
         return (
@@ -87,9 +89,21 @@ const PomodoroProgressBar = ({
                 flex: phase.duration,
                 backgroundColor: phase.color,
               },
-              glowStyle,
+              activeStyle,
             ]}
-          />
+          >
+            {isActive && (
+              <View style={{ 
+                position: 'absolute', 
+                top: 0, 
+                left: 0, 
+                right: 0, 
+                bottom: 0, 
+                backgroundColor: 'rgba(255, 255, 255, 0.2)',
+                borderRadius: 3,
+              }} />
+            )}
+          </View>
         );
       })}
     </View>
@@ -110,6 +124,13 @@ const TimerScreen = () => {
   const focusSeconds = sessionStats.focusSeconds;
   const breakSeconds = sessionStats.breakSeconds;
 
+  const modeColors = useMemo(() => ({
+    work: palette.secondary,
+    short: palette.primary,
+    long: palette.success,
+    free: palette.accent,
+  }), [palette]);
+
   const formatCompactTime = (seconds: number) => {
     const hours = Math.floor(seconds / 3600);
     const mins = Math.floor((seconds % 3600) / 60);
@@ -124,31 +145,31 @@ const TimerScreen = () => {
         key: 'work',
         label: t('timer.score.work', uiLang),
         value: totals.work.toString(),
-        icon: <Target size={iconSize} color={palette.secondary} strokeWidth={2} />,
+        icon: <Target size={iconSize} color={modeColors.work} strokeWidth={2} />,
       },
       {
         key: 'short',
         label: t('timer.score.short', uiLang),
         value: totals.short.toString(),
-        icon: <Coffee size={iconSize} color={palette.primary} strokeWidth={2} />,
+        icon: <Coffee size={iconSize} color={modeColors.short} strokeWidth={2} />,
       },
       {
         key: 'long',
         label: t('timer.score.long', uiLang),
         value: totals.long.toString(),
-        icon: <Moon size={iconSize} color={palette.success} strokeWidth={2} />,
+        icon: <Moon size={iconSize} color={modeColors.long} strokeWidth={2} />,
       },
       {
         key: 'focus',
         label: t('stats.focusTime', uiLang),
         value: formatCompactTime(focusSeconds),
-        icon: <TimerIcon size={iconSize} color={palette.secondary} strokeWidth={2} />,
+        icon: <TimerIcon size={iconSize} color={modeColors.work} strokeWidth={2} />,
       },
       {
         key: 'break',
         label: t('stats.breakTime', uiLang),
         value: formatCompactTime(breakSeconds),
-        icon: <Smile size={iconSize} color={palette.primary} strokeWidth={2} />,
+        icon: <Smile size={iconSize} color={modeColors.short} strokeWidth={2} />,
       },
       {
         key: 'sessions',
@@ -189,6 +210,10 @@ const TimerScreen = () => {
     sessionStats.bestScoreStreak,
     totalScore,
     uiLang,
+    modeColors,
+    palette.success, // Keep dependencies that are not from modeColors
+    palette.accent,
+    palette.warning,
   ]);
 
   const workSec = Math.max(1, prefs.workDuration) * 60;
@@ -205,6 +230,9 @@ const TimerScreen = () => {
   const [isActive, setIsActive] = useState(false);
   const [mode, setMode] = useState<Mode>('work');
   const workCycleRef = useRef(0);
+
+  const activeModeColor = modeColors[mode];
+
   const base = Math.min(winW, winH);
   const isLandscape = winW > winH;
   const isPortrait = !isLandscape;
@@ -239,7 +267,6 @@ const TimerScreen = () => {
   const playerContainerGap = vs(usePlayerLayout ? 20 : 16);
   const playerContainerMarginTop = vs(usePlayerLayout ? 24 : 12);
 
-  const isBreak = mode === 'short' || mode === 'long';
   const total = mode === 'free' ? workSec : presetTimes[mode];
   const progress = mode === 'free'
     ? (Math.min(timeLeft, total) / Math.max(1, total)) * 100
@@ -248,19 +275,14 @@ const TimerScreen = () => {
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const glowAnim = useRef(new Animated.Value(0)).current;
 
-  const currentPhaseIndex = useMemo(() => {
-    if (mode === 'work') {
-      return workCycleRef.current * 2;
-    }
-    if (mode === 'short') {
-      // This logic assumes the cycle ref has already been incremented by the advancePhase function
-      return workCycleRef.current * 2 - 1;
-    }
-    if (mode === 'long') {
-      return 7;
-    }
-    return -1; // Not in a standard pomodoro phase
-  }, [mode]);
+  let currentPhaseIndex = -1;
+  if (mode === 'work') {
+    currentPhaseIndex = workCycleRef.current * 2;
+  } else if (mode === 'short') {
+    currentPhaseIndex = workCycleRef.current * 2 - 1;
+  } else if (mode === 'long') {
+    currentPhaseIndex = 7;
+  }
 
   useEffect(() => {
     let interval: ReturnType<typeof setInterval> | null = null;
@@ -393,28 +415,36 @@ const TimerScreen = () => {
     { key: 'free', label: t('settings.freeFocus', uiLang) },
   ];
 
-  const presetButtons = presetOptions.map(({ key, label }) => (
-    <TouchableOpacity
-      key={key}
-      onPress={() => handlePresetPress(key)}
-      style={[
-        styles.presetButton,
-        useScrollPresets ? { width: presetWidth } : styles.presetButtonEqual,
-        isCompact && styles.presetButtonCompact,
-        mode === key && styles.presetActive,
-      ]}
-    >
-      <Text
+  const presetButtons = presetOptions.map(({ key, label }) => {
+    const isModeActive = mode === key;
+    const buttonColor = modeColors[key];
+
+    return (
+      <TouchableOpacity
+        key={key}
+        onPress={() => handlePresetPress(key)}
         style={[
-          styles.presetText,
-          isCompact && styles.presetTextCompact,
-          mode === key && styles.presetTextActive,
+          styles.presetButton,
+          useScrollPresets ? { width: presetWidth } : styles.presetButtonEqual,
+          isCompact && styles.presetButtonCompact,
+          { borderColor: buttonColor },
+          isModeActive && [styles.presetActive, { backgroundColor: `${buttonColor}33` }],
         ]}
       >
-        {label}
-      </Text>
-    </TouchableOpacity>
-  ));
+        <Text
+          style={[
+            styles.presetText,
+            isCompact && styles.presetTextCompact,
+            { color: buttonColor },
+            isModeActive && styles.presetTextActive,
+          ]}
+        >
+          {label}
+        </Text>
+      </TouchableOpacity>
+    );
+  });
+
   const [showShortcuts, setShowShortcuts] = useState(false);
 
   useEffect(() => {
@@ -456,10 +486,10 @@ const TimerScreen = () => {
   useEffect(() => {
     if (!isWeb || typeof document === 'undefined') return;
     const baseTitle = baseTitleRef.current || 'Retro Odak';
-    const statusLabel = isBreak ? t('timer.break', uiLang) : t('timer.focus', uiLang);
+    const statusLabel = mode === 'work' ? t('timer.focus', uiLang) : t('timer.break', uiLang);
     const formattedRemaining = formatTime(Math.max(0, timeLeft));
     document.title = `${formattedRemaining} - ${statusLabel} - ${baseTitle}`;
-  }, [isWeb, timeLeft, isBreak, uiLang]);
+  }, [isWeb, timeLeft, mode, uiLang]);
 
   const portraitBasis = '32%';
 
@@ -481,12 +511,12 @@ const TimerScreen = () => {
       >
         {scoreItems.map(item => {
           const accentColor =
-            item.key === 'work' ? palette.secondary :
-            item.key === 'short' ? palette.primary :
-            item.key === 'long' ? palette.success :
+            item.key === 'work' ? modeColors.work :
+            item.key === 'short' ? modeColors.short :
+            item.key === 'long' ? modeColors.long :
             item.key === 'sessions' ? palette.success :
-            item.key === 'focus' ? palette.secondary :
-            item.key === 'break' ? palette.primary :
+            item.key === 'focus' ? modeColors.work :
+            item.key === 'break' ? modeColors.short :
             item.key === 'streak' ? palette.accent :
             item.key === 'combo' ? palette.warning :
             palette.warning;
@@ -794,34 +824,34 @@ const TimerScreen = () => {
           <View
             style={[
               styles.webDock,
-              { height: webDockHeight },
+              { height: webDockHeight, borderBottomColor: activeModeColor },
             ]}
           >
-            <Text style={styles.webDockMode}>{mode === 'work' ? t('settings.work', uiLang) : mode === 'short' ? t('settings.shortBreak', uiLang) : mode === 'long' ? t('settings.longBreak', uiLang) : t('settings.freeFocus', uiLang)}</Text>
-            <Text style={styles.webDockTime}>{formatTime(timeLeft)}</Text>
+            <Text style={styles.webDockMode}>{t(`settings.${mode}`, uiLang)}</Text>
+            <Text style={[styles.webDockTime, { color: activeModeColor }]}>{formatTime(timeLeft)}</Text>
             <View style={styles.webDockControls}>
               <TouchableOpacity
                 accessibilityLabel="Play/Pause (Space or K)"
                 onPress={toggleTimer}
-                style={[styles.webDockBtn, { cursor: 'pointer' } as any]}
+                style={[styles.webDockBtn, { borderColor: activeModeColor, backgroundColor: `${activeModeColor}22` }]}
               >
                 {isActive ? (
-                  <Pause size={18} color={palette.primary} strokeWidth={2} />
+                  <Pause size={18} color={activeModeColor} strokeWidth={2} />
                 ) : (
-                  <Play size={18} color={palette.primary} strokeWidth={2} />
+                  <Play size={18} color={activeModeColor} strokeWidth={2} />
                 )}
               </TouchableOpacity>
               <TouchableOpacity
                 accessibilityLabel="Skip (R)"
                 onPress={skipPhase}
-                style={[styles.webDockBtn, { cursor: 'pointer' } as any]}
+                style={[styles.webDockBtn, { borderColor: activeModeColor, backgroundColor: `${activeModeColor}22` }]}
               >
-                <SkipForward size={18} color={palette.primary} strokeWidth={2} />
+                <SkipForward size={18} color={activeModeColor} strokeWidth={2} />
               </TouchableOpacity>
             </View>
             <View style={styles.webDockProgressBar}>
               <Animated.View
-                style={[styles.webDockProgressFill, { width: `${progress}%`, backgroundColor: isBreak ? palette.accent : palette.secondary }]}
+                style={[styles.webDockProgressFill, { width: `${progress}%`, backgroundColor: activeModeColor }]}
               />
             </View>
           </View>
@@ -832,9 +862,9 @@ const TimerScreen = () => {
         >
           <View style={{ height: 0 }} />
           <View style={[styles.header, isCompact && styles.headerCompact, usePlayerLayout && styles.headerLandscape]}>
-            <Text style={[styles.title, { fontSize: titleSize }]}>{t('timer.heading', uiLang)}</Text>
-            <Text style={[styles.subtitle, { fontSize: subtitleSize }]}>
-              {isBreak ? t('timer.break', uiLang) : t('timer.focus', uiLang)} ? {formatTime(timeLeft)}
+            <Text style={[styles.title, { fontSize: titleSize, color: activeModeColor, textShadowColor: activeModeColor }]}>{t('timer.heading', uiLang)}</Text>
+            <Text style={[styles.subtitle, { fontSize: subtitleSize, color: activeModeColor }]}>
+              {mode === 'work' ? t('timer.focus', uiLang) : t('timer.break', uiLang)} ? {formatTime(timeLeft)}
             </Text>
           </View>
 
@@ -872,12 +902,12 @@ const TimerScreen = () => {
                 },
               ]}
             >
-              <View style={[styles.playerCard, styles.playerCardLandscape]}>
+              <View style={[styles.playerCard, { borderColor: activeModeColor }]}>
                 <View style={styles.playerInfo}>
-                  <Text style={[styles.playerMode, { color: isBreak ? palette.accent : palette.primary }]}>
-                    {isBreak ? t('timer.break', uiLang) : t('timer.focus', uiLang)}
+                  <Text style={[styles.playerMode, { color: activeModeColor }]}>
+                    {mode === 'work' ? t('timer.focus', uiLang) : t('timer.break', uiLang)}
                   </Text>
-                  <Text style={[styles.playerTime, { color: isBreak ? palette.accent : palette.secondary, fontSize: timeSize }]}>
+                  <Text style={[styles.playerTime, { color: activeModeColor, fontSize: timeSize }]}>
                     {formatTime(timeLeft)}
                   </Text>
                 </View>
@@ -885,25 +915,25 @@ const TimerScreen = () => {
                   <TouchableOpacity
                     style={[
                       styles.playerControlButton,
-                      { width: playerButtonSize, height: playerButtonSize, borderRadius: playerButtonSize / 2 },
+                      { width: playerButtonSize, height: playerButtonSize, borderRadius: playerButtonSize / 2, borderColor: activeModeColor, backgroundColor: `${activeModeColor}22` },
                     ]}
                     onPress={toggleTimer}
                   >
                     {isActive ? (
-                      <Pause size={controlIcon} color={palette.primary} strokeWidth={2} />
+                      <Pause size={controlIcon} color={activeModeColor} strokeWidth={2} />
                     ) : (
-                      <Play size={controlIcon} color={palette.primary} strokeWidth={2} />
+                      <Play size={controlIcon} color={activeModeColor} strokeWidth={2} />
                     )}
                   </TouchableOpacity>
 
                   <TouchableOpacity
                     style={[
                       styles.playerControlButton,
-                      { width: playerButtonSize, height: playerButtonSize, borderRadius: playerButtonSize / 2 },
+                      { width: playerButtonSize, height: playerButtonSize, borderRadius: playerButtonSize / 2, borderColor: activeModeColor, backgroundColor: `${activeModeColor}22` },
                     ]}
                     onPress={skipPhase}
                   >
-                    <SkipForward size={controlIcon} color={palette.primary} strokeWidth={2} />
+                    <SkipForward size={controlIcon} color={activeModeColor} strokeWidth={2} />
                   </TouchableOpacity>
                 </View>
               </View>
@@ -915,7 +945,7 @@ const TimerScreen = () => {
                       styles.playerProgressFill,
                       {
                         width: `${progress}%`,
-                        backgroundColor: isBreak ? palette.accent : palette.secondary,
+                        backgroundColor: activeModeColor,
                       },
                     ]}
                   />
@@ -942,12 +972,14 @@ const TimerScreen = () => {
                     height: circleSize,
                     borderRadius: circleSize / 2,
                     transform: [{ scale: pulseAnim }],
-                    shadowColor: isBreak ? palette.accent : palette.secondary,
+                    borderColor: activeModeColor,
+                    shadowColor: activeModeColor,
+                    backgroundColor: `${activeModeColor}11`,
                     shadowOpacity: glowAnim,
                   }
                 ]}
               >
-                <Text style={[styles.timeText, { color: isBreak ? palette.accent : palette.secondary, fontSize: timeSize }]}>
+                <Text style={[styles.timeText, { color: activeModeColor, fontSize: timeSize }]}>
                   {formatTime(timeLeft)}
                 </Text>
               </Animated.View>
@@ -960,7 +992,7 @@ const TimerScreen = () => {
                       styles.progressFill,
                       { 
                         width: `${progress}%`,
-                        backgroundColor: isBreak ? palette.accent : palette.secondary,
+                        backgroundColor: activeModeColor,
                       }
                     ]} 
                   />
@@ -975,16 +1007,16 @@ const TimerScreen = () => {
               </View>
 
               <View style={styles.controlButtons}>
-                <TouchableOpacity style={[styles.controlButton, { width: buttonSize, height: buttonSize, borderRadius: buttonSize / 2 }]} onPress={toggleTimer}>
+                <TouchableOpacity style={[styles.controlButton, { width: buttonSize, height: buttonSize, borderRadius: buttonSize / 2, borderColor: activeModeColor, backgroundColor: `${activeModeColor}22` }]} onPress={toggleTimer}>
                   {isActive ? (
-                    <Pause size={controlIcon} color={palette.primary} strokeWidth={2} />
+                    <Pause size={controlIcon} color={activeModeColor} strokeWidth={2} />
                   ) : (
-                    <Play size={controlIcon} color={palette.primary} strokeWidth={2} />
+                    <Play size={controlIcon} color={activeModeColor} strokeWidth={2} />
                   )}
                 </TouchableOpacity>
 
-                <TouchableOpacity style={[styles.controlButton, { width: buttonSize, height: buttonSize, borderRadius: buttonSize / 2 }]} onPress={skipPhase}>
-                  <SkipForward size={controlIcon} color={palette.primary} strokeWidth={2} />
+                <TouchableOpacity style={[styles.controlButton, { width: buttonSize, height: buttonSize, borderRadius: buttonSize / 2, borderColor: activeModeColor, backgroundColor: `${activeModeColor}22` }]} onPress={skipPhase}>
+                  <SkipForward size={controlIcon} color={activeModeColor} strokeWidth={2} />
                 </TouchableOpacity>
               </View>
 
@@ -1011,9 +1043,9 @@ const TimerScreen = () => {
       ) : (
         <ScrollView>
           <View style={[styles.header, isCompact && styles.headerCompact, usePlayerLayout && styles.headerLandscape]}>
-            <Text style={[styles.title, { fontSize: titleSize }]}>{t('timer.heading', uiLang)}</Text>
-            <Text style={[styles.subtitle, { fontSize: subtitleSize }]}>
-              {isBreak ? t('timer.break', uiLang) : t('timer.focus', uiLang)} ? {formatTime(timeLeft)}
+            <Text style={[styles.title, { fontSize: titleSize, color: activeModeColor, textShadowColor: activeModeColor }]}>{t('timer.heading', uiLang)}</Text>
+            <Text style={[styles.subtitle, { fontSize: subtitleSize, color: activeModeColor }]}>
+              {mode === 'work' ? t('timer.focus', uiLang) : t('timer.break', uiLang)} ? {formatTime(timeLeft)}
             </Text>
           </View>
 
@@ -1051,12 +1083,12 @@ const TimerScreen = () => {
                 },
               ]}
             >
-              <View style={[styles.playerCard, styles.playerCardLandscape]}>
+              <View style={[styles.playerCard, { borderColor: activeModeColor }]}>
                 <View style={styles.playerInfo}>
-                  <Text style={[styles.playerMode, { color: isBreak ? palette.accent : palette.primary }]}>
-                    {isBreak ? t('timer.break', uiLang) : t('timer.focus', uiLang)}
+                  <Text style={[styles.playerMode, { color: activeModeColor }]}>
+                    {mode === 'work' ? t('timer.focus', uiLang) : t('timer.break', uiLang)}
                   </Text>
-                  <Text style={[styles.playerTime, { color: isBreak ? palette.accent : palette.secondary, fontSize: timeSize }]}>
+                  <Text style={[styles.playerTime, { color: activeModeColor, fontSize: timeSize }]}>
                     {formatTime(timeLeft)}
                   </Text>
                 </View>
@@ -1064,25 +1096,25 @@ const TimerScreen = () => {
                   <TouchableOpacity
                     style={[
                       styles.playerControlButton,
-                      { width: playerButtonSize, height: playerButtonSize, borderRadius: playerButtonSize / 2 },
+                      { width: playerButtonSize, height: playerButtonSize, borderRadius: playerButtonSize / 2, borderColor: activeModeColor, backgroundColor: `${activeModeColor}22` },
                     ]}
                     onPress={toggleTimer}
                   >
                     {isActive ? (
-                      <Pause size={controlIcon} color={palette.primary} strokeWidth={2} />
+                      <Pause size={controlIcon} color={activeModeColor} strokeWidth={2} />
                     ) : (
-                      <Play size={controlIcon} color={palette.primary} strokeWidth={2} />
+                      <Play size={controlIcon} color={activeModeColor} strokeWidth={2} />
                     )}
                   </TouchableOpacity>
 
                   <TouchableOpacity
                     style={[
                       styles.playerControlButton,
-                      { width: playerButtonSize, height: playerButtonSize, borderRadius: playerButtonSize / 2 },
+                      { width: playerButtonSize, height: playerButtonSize, borderRadius: playerButtonSize / 2, borderColor: activeModeColor, backgroundColor: `${activeModeColor}22` },
                     ]}
                     onPress={skipPhase}
                   >
-                    <SkipForward size={controlIcon} color={palette.primary} strokeWidth={2} />
+                    <SkipForward size={controlIcon} color={activeModeColor} strokeWidth={2} />
                   </TouchableOpacity>
                 </View>
               </View>
@@ -1094,12 +1126,18 @@ const TimerScreen = () => {
                       styles.playerProgressFill,
                       {
                         width: `${progress}%`,
-                        backgroundColor: isBreak ? palette.accent : palette.secondary,
+                        backgroundColor: activeModeColor,
                       },
                     ]}
                   />
                 </View>
-                <PomodoroProgressBar cycle={workCycleRef.current} mode={mode} palette={palette} />
+                <PomodoroProgressBar
+                  currentPhaseIndex={currentPhaseIndex}
+                  workDuration={prefs.workDuration}
+                  shortBreakDuration={prefs.shortBreakDuration}
+                  longBreakDuration={prefs.longBreakDuration}
+                  palette={palette}
+                />
               </View>
 
               {renderScoreBoard('landscape')}
@@ -1115,12 +1153,14 @@ const TimerScreen = () => {
                     height: circleSize,
                     borderRadius: circleSize / 2,
                     transform: [{ scale: pulseAnim }],
-                    shadowColor: isBreak ? palette.accent : palette.secondary,
+                    borderColor: activeModeColor,
+                    shadowColor: activeModeColor,
+                    backgroundColor: `${activeModeColor}11`,
                     shadowOpacity: glowAnim,
                   }
                 ]}
               >
-                <Text style={[styles.timeText, { color: isBreak ? palette.accent : palette.secondary, fontSize: timeSize }]}>
+                <Text style={[styles.timeText, { color: activeModeColor, fontSize: timeSize }]}>
                   {formatTime(timeLeft)}
                 </Text>
               </Animated.View>
@@ -1133,25 +1173,31 @@ const TimerScreen = () => {
                       styles.progressFill,
                       { 
                         width: `${progress}%`,
-                        backgroundColor: isBreak ? palette.accent : palette.secondary,
+                        backgroundColor: activeModeColor,
                       }
                     ]} 
                   />
                 </View>
-                <PomodoroProgressBar cycle={workCycleRef.current} mode={mode} palette={palette} />
+                <PomodoroProgressBar
+                  currentPhaseIndex={currentPhaseIndex}
+                  workDuration={prefs.workDuration}
+                  shortBreakDuration={prefs.shortBreakDuration}
+                  longBreakDuration={prefs.longBreakDuration}
+                  palette={palette}
+                />
               </View>
 
               <View style={styles.controlButtons}>
-                <TouchableOpacity style={[styles.controlButton, { width: buttonSize, height: buttonSize, borderRadius: buttonSize / 2 }]} onPress={toggleTimer}>
+                <TouchableOpacity style={[styles.controlButton, { width: buttonSize, height: buttonSize, borderRadius: buttonSize / 2, borderColor: activeModeColor, backgroundColor: `${activeModeColor}22` }]} onPress={toggleTimer}>
                   {isActive ? (
-                    <Pause size={controlIcon} color={palette.primary} strokeWidth={2} />
+                    <Pause size={controlIcon} color={activeModeColor} strokeWidth={2} />
                   ) : (
-                    <Play size={controlIcon} color={palette.primary} strokeWidth={2} />
+                    <Play size={controlIcon} color={activeModeColor} strokeWidth={2} />
                   )}
                 </TouchableOpacity>
 
-                <TouchableOpacity style={[styles.controlButton, { width: buttonSize, height: buttonSize, borderRadius: buttonSize / 2 }]} onPress={skipPhase}>
-                  <SkipForward size={controlIcon} color={palette.primary} strokeWidth={2} />
+                <TouchableOpacity style={[styles.controlButton, { width: buttonSize, height: buttonSize, borderRadius: buttonSize / 2, borderColor: activeModeColor, backgroundColor: `${activeModeColor}22` }]} onPress={skipPhase}>
+                  <SkipForward size={controlIcon} color={activeModeColor} strokeWidth={2} />
                 </TouchableOpacity>
               </View>
 
@@ -1248,9 +1294,8 @@ const makeStyles = (palette: any) => StyleSheet.create({
     paddingHorizontal: s(10),
     paddingVertical: s(6),
     borderWidth: 1,
-    borderColor: palette.border,
     borderRadius: 16,
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: 'transparent',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1264,13 +1309,11 @@ const makeStyles = (palette: any) => StyleSheet.create({
     paddingVertical: s(6),
   },
   presetActive: {
-    borderColor: palette.borderActive,
-    backgroundColor: 'rgba(0,255,255,0.12)',
+    borderWidth: 2,
   },
   presetText: {
     fontFamily: FONT_REGULAR,
     fontSize: ms(10),
-    color: palette.text,
     letterSpacing: 1,
     textAlign: 'center',
   },
@@ -1278,21 +1321,16 @@ const makeStyles = (palette: any) => StyleSheet.create({
     fontSize: ms(9),
   },
   presetTextActive: {
-    color: palette.primary,
     fontFamily: FONT_SEMIBOLD,
   },
   title: {
     fontFamily: FONT_BOLD,
     fontSize: ms(28),
-    color: palette.primary,
     letterSpacing: 4,
-    textShadowColor: palette.primary,
-    textShadowRadius: 10,
   },
   subtitle: {
     fontFamily: FONT_REGULAR,
     fontSize: ms(14),
-    color: palette.secondary,
     letterSpacing: 2,
     marginTop: 8,
   },
@@ -1305,17 +1343,14 @@ const makeStyles = (palette: any) => StyleSheet.create({
   },
   timerCircle: {
     borderWidth: 4,
-    borderColor: palette.secondary,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255,0,255,0.05)',
     marginTop: vs(6),
     shadowRadius: s(20),
     elevation: s(6),
   },
   timeText: {
     fontFamily: FONT_BOLD,
-    fontSize: ms(40),
     letterSpacing: 2,
   },
   progressContainer: {
@@ -1334,18 +1369,14 @@ const makeStyles = (palette: any) => StyleSheet.create({
   pomodoroBar: {
     flexDirection: 'row',
     width: '80%',
-    height: s(10),
+    height: s(12),
     borderRadius: 5,
-    overflow: 'hidden',
+    overflow: 'visible', // Allow shadows to be visible
     gap: s(4),
   },
   pomodoroSegment: {
-    flex: 1,
     height: '100%',
-  },
-  pomodoroSegmentLong: {
-    borderTopRightRadius: 5,
-    borderBottomRightRadius: 5,
+    borderRadius: 3,
   },
   progressFill: {
     height: '100%',
@@ -1360,9 +1391,7 @@ const makeStyles = (palette: any) => StyleSheet.create({
     width: s(64),
     height: s(64),
     borderRadius: s(32),
-    backgroundColor: 'rgba(0,255,255,0.1)',
     borderWidth: 2,
-    borderColor: palette.primary,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1379,7 +1408,6 @@ const makeStyles = (palette: any) => StyleSheet.create({
     paddingVertical: s(14),
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: 'rgba(0,255,255,0.35)',
     backgroundColor: 'rgba(0,0,50,0.35)',
     gap: s(16),
   },
@@ -1396,11 +1424,9 @@ const makeStyles = (palette: any) => StyleSheet.create({
     fontFamily: FONT_REGULAR,
     fontSize: ms(12),
     letterSpacing: 2,
-    color: palette.text,
   },
   playerTime: {
     fontFamily: FONT_BOLD,
-    fontSize: ms(32),
     letterSpacing: 2,
   },
   playerControlsRow: {
@@ -1415,8 +1441,6 @@ const makeStyles = (palette: any) => StyleSheet.create({
   },
   playerControlButton: {
     borderWidth: 2,
-    borderColor: palette.primary,
-    backgroundColor: 'rgba(0,255,255,0.12)',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1684,7 +1708,6 @@ const makeStyles = (palette: any) => StyleSheet.create({
     right: 0,
     zIndex: 1000,
     backgroundColor: 'rgba(0,0,20,0.9)',
-    borderBottomColor: '#FF00FF',
     borderBottomWidth: 2,
     paddingHorizontal: s(12),
     flexDirection: 'row',
@@ -1701,7 +1724,6 @@ const makeStyles = (palette: any) => StyleSheet.create({
   webDockTime: {
     fontFamily: FONT_BOLD,
     fontSize: ms(20),
-    color: palette.secondary,
     letterSpacing: 1,
   },
   webDockControls: {
@@ -1714,8 +1736,6 @@ const makeStyles = (palette: any) => StyleSheet.create({
     height: s(32),
     borderRadius: s(16),
     borderWidth: 2,
-    borderColor: palette.primary,
-    backgroundColor: 'rgba(0,255,255,0.12)',
     alignItems: 'center',
     justifyContent: 'center',
   },
