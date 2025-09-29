@@ -32,7 +32,7 @@ import { useRouter } from 'expo-router';
 import { useTheme } from '@/context/ThemeContext';
 import { Palette } from '@/lib/theme';
 
-type Mode = 'work' | 'short' | 'long' | 'free';
+type Mode = 'work' | 'short' | 'long';
 type ScoreItem = { key: string; label: string; value: string; emphasis?: boolean; icon: React.ReactNode };
 
 const FONT_REGULAR = 'Poppins-Regular';
@@ -128,7 +128,6 @@ const TimerScreen = () => {
     work: palette.secondary,
     short: palette.primary,
     long: palette.success,
-    free: palette.accent,
   }), [palette]);
 
   const formatCompactTime = (seconds: number) => {
@@ -223,7 +222,6 @@ const TimerScreen = () => {
     work: workSec,
     short: shortSec,
     long: longSec,
-    free: 0, // counts up
   };
 
   const [timeLeft, setTimeLeft] = useState(workSec);
@@ -249,7 +247,6 @@ const TimerScreen = () => {
   const controlIcon = usePlayerLayout ? msc(28, 22, 34) : isCompact ? msc(22, 18, 26) : msc(26, 20, 30);
   const buttonSize = isCompact || usePlayerLayout ? clamp(s(56), 50, 80) : clamp(s(64), 56, 84);
   const titleSize = usePlayerLayout ? msc(24, 18, 30) : isCompact ? msc(22, 16, 26) : msc(28, 18, 30);
-  const subtitleSize = usePlayerLayout ? msc(13, 11, 18) : isCompact ? msc(12, 10, 16) : msc(14, 12, 18);
   const timeSize = usePlayerLayout ? msc(44, 34, 56) : isCompact ? msc(40, 30, 52) : msc(52, 36, 64);
   const presetWidth = usePlayerLayout
     ? clamp(base * 0.28, 120, 200)
@@ -267,10 +264,8 @@ const TimerScreen = () => {
   const playerContainerGap = vs(usePlayerLayout ? 20 : 16);
   const playerContainerMarginTop = vs(usePlayerLayout ? 24 : 12);
 
-  const total = mode === 'free' ? workSec : presetTimes[mode];
-  const progress = mode === 'free'
-    ? (Math.min(timeLeft, total) / Math.max(1, total)) * 100
-    : ((total - timeLeft) / Math.max(1, total)) * 100;
+  const total = presetTimes[mode];
+  const progress = ((total - timeLeft) / Math.max(1, total)) * 100;
 
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const glowAnim = useRef(new Animated.Value(0)).current;
@@ -288,7 +283,7 @@ const TimerScreen = () => {
     let interval: ReturnType<typeof setInterval> | null = null;
     if (isActive) {
       interval = setInterval(() =>
-        setTimeLeft(prev => (mode === 'free' ? prev + 1 : Math.max(prev - 1, 0))),
+        setTimeLeft(prev => Math.max(prev - 1, 0)),
       1000);
     }
     return () => {
@@ -297,7 +292,7 @@ const TimerScreen = () => {
   }, [isActive, mode]);
 
   useEffect(() => {
-    setTimeLeft(mode === 'work' ? workSec : mode === 'short' ? shortSec : mode === 'long' ? longSec : 0);
+    setTimeLeft(presetTimes[mode]);
   }, [mode, workSec, shortSec, longSec]);
 
   useEffect(() => {
@@ -352,28 +347,20 @@ const TimerScreen = () => {
   };
 
   const handlePresetPress = (nextMode: Mode) => {
-    if (mode === 'free' && nextMode !== 'free' && timeLeft > 0) {
-      recordSession('work', timeLeft);
-    }
     if (nextMode === 'work') {
       workCycleRef.current = 0;
     }
     setMode(nextMode);
     setIsActive(false);
-    setTimeLeft(nextMode === 'free' ? 0 : presetTimes[nextMode]);
+    setTimeLeft(presetTimes[nextMode]);
   };
 
   const advancePhase = useCallback(
     (completed: Mode, opts?: { skip?: boolean }) => {
       const skip = opts?.skip ?? false;
 
-      const duration =
-        completed === 'work' ? workSec :
-        completed === 'short' ? shortSec :
-        completed === 'long' ? longSec : 0;
-
-      if (!skip && completed !== 'free') {
-        recordSession(completed, duration);
+      if (!skip) {
+        recordSession(completed, presetTimes[completed]);
       }
 
       let nextMode: Mode = 'work';
@@ -392,18 +379,16 @@ const TimerScreen = () => {
       } else if (completed === 'long') {
         workCycleRef.current = 0;
         nextMode = 'work';
-      } else {
-        nextMode = 'work';
       }
 
       setIsActive(false);
       setMode(nextMode);
     },
-    [workSec, shortSec, longSec, recordSession]
+    [workSec, shortSec, longSec, recordSession, presetTimes]
   );
 
   useEffect(() => {
-    if (mode !== 'free' && timeLeft === 0) {
+    if (timeLeft === 0) {
       advancePhase(mode);
     }
   }, [timeLeft, mode, advancePhase]);
@@ -412,7 +397,6 @@ const TimerScreen = () => {
     { key: 'work', label: t('settings.work', uiLang) },
     { key: 'short', label: t('settings.shortBreak', uiLang) },
     { key: 'long', label: t('settings.longBreak', uiLang) },
-    { key: 'free', label: t('settings.freeFocus', uiLang) },
   ];
 
   const presetButtons = presetOptions.map(({ key, label }) => {
@@ -465,7 +449,6 @@ const TimerScreen = () => {
       if (key === '1') { handlePresetPress('work'); return; }
       if (key === '2') { handlePresetPress('short'); return; }
       if (key === '3') { handlePresetPress('long'); return; }
-      if (key === '4') { handlePresetPress('free'); return; }
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
@@ -809,6 +792,14 @@ const TimerScreen = () => {
     );
   }
 
+  const AppTitle = () => (
+    <View style={[styles.header, isCompact && styles.headerCompact, usePlayerLayout && styles.headerLandscape]}>
+      <Text style={[styles.title, { fontSize: titleSize, color: activeModeColor, textShadowColor: activeModeColor }]}>
+        {t('timer.heading', uiLang)}
+      </Text>
+    </View>
+  );
+
   return (
     <LinearGradient
       colors={theme.gradient}
@@ -861,13 +852,7 @@ const TimerScreen = () => {
           showsVerticalScrollIndicator={true}
         >
           <View style={{ height: 0 }} />
-          <View style={[styles.header, isCompact && styles.headerCompact, usePlayerLayout && styles.headerLandscape]}>
-            <Text style={[styles.title, { fontSize: titleSize, color: activeModeColor, textShadowColor: activeModeColor }]}>{t('timer.heading', uiLang)}</Text>
-            <Text style={[styles.subtitle, { fontSize: subtitleSize, color: activeModeColor }]}>
-              {mode === 'work' ? t('timer.focus', uiLang) : t('timer.break', uiLang)} ? {formatTime(timeLeft)}
-            </Text>
-          </View>
-
+          
           {useScrollPresets ? (
             <ScrollView
               horizontal
@@ -1024,6 +1009,7 @@ const TimerScreen = () => {
             </View>
           )}
           <StatsSection />
+          <AppTitle />
         </ScrollView>
         {showShortcuts && (
           <View style={styles.shortcutOverlay}>
@@ -1031,7 +1017,7 @@ const TimerScreen = () => {
               <Text style={styles.shortcutTitle}>Shortcuts</Text>
               <Text style={styles.shortcutRow}>Space / K - Play or Pause</Text>
               <Text style={styles.shortcutRow}>R - Skip phase</Text>
-              <Text style={styles.shortcutRow}>1 / 2 / 3 / 4 - Work / Short / Long / Free</Text>
+              <Text style={styles.shortcutRow}>1 / 2 / 3 - Work / Short / Long</Text>
               <Text style={styles.shortcutRow}>S - Settings, T - Tasks, ? - Toggle help</Text>
               <TouchableOpacity onPress={() => setShowShortcuts(false)} style={[styles.webDockBtn, { alignSelf: 'center', marginTop: vs(10) }]}>
                 <Text style={{ color: palette.primary, fontFamily: FONT_SEMIBOLD }}>Close</Text>
@@ -1041,14 +1027,7 @@ const TimerScreen = () => {
         )}
         </>
       ) : (
-        <ScrollView>
-          <View style={[styles.header, isCompact && styles.headerCompact, usePlayerLayout && styles.headerLandscape]}>
-            <Text style={[styles.title, { fontSize: titleSize, color: activeModeColor, textShadowColor: activeModeColor }]}>{t('timer.heading', uiLang)}</Text>
-            <Text style={[styles.subtitle, { fontSize: subtitleSize, color: activeModeColor }]}>
-              {mode === 'work' ? t('timer.focus', uiLang) : t('timer.break', uiLang)} ? {formatTime(timeLeft)}
-            </Text>
-          </View>
-
+        <ScrollView contentContainerStyle={{ paddingBottom: vs(24) }}>
           {useScrollPresets ? (
             <ScrollView
               horizontal
@@ -1205,6 +1184,7 @@ const TimerScreen = () => {
             </View>
           )}
           <StatsSection />
+          <AppTitle />
         </ScrollView>
       )}
 
@@ -1248,6 +1228,7 @@ const makeStyles = (palette: any) => StyleSheet.create({
   header: {
     alignItems: 'center',
     paddingVertical: vs(8),
+    marginTop: vs(24), // Add some margin to push it down
   },
   statsHeader: {
     alignItems: 'center',
@@ -1282,7 +1263,7 @@ const makeStyles = (palette: any) => StyleSheet.create({
   },
   presetRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'center', // Changed from space-between
     flexWrap: 'wrap',
     gap: s(6),
     marginTop: vs(6),
@@ -1301,8 +1282,8 @@ const makeStyles = (palette: any) => StyleSheet.create({
   },
   presetButtonEqual: {
     flexGrow: 1,
-    flexBasis: '24%',
-    maxWidth: '24%',
+    flexBasis: '31%', // Adjusted for 3 buttons
+    maxWidth: '31%', // Adjusted for 3 buttons
     minWidth: s(90),
   },
   presetButtonCompact: {
@@ -1327,12 +1308,6 @@ const makeStyles = (palette: any) => StyleSheet.create({
     fontFamily: FONT_BOLD,
     fontSize: ms(28),
     letterSpacing: 4,
-  },
-  subtitle: {
-    fontFamily: FONT_REGULAR,
-    fontSize: ms(14),
-    letterSpacing: 2,
-    marginTop: 8,
   },
   timerSection: {
     flex: 1,
