@@ -6,6 +6,8 @@ import { t, resolveLang } from '@/lib/i18n';
 import { usePrefs } from '@/context/PrefsContext';
 import { useTheme } from '@/context/ThemeContext';
 
+const FONT_SEMIBOLD = 'Poppins-SemiBold';
+
 export default function TabLayout() {
   const { width } = useWindowDimensions();
   const isTablet = width >= 768;

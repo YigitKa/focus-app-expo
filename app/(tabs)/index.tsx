@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import {
   View,
   Text,
@@ -13,7 +13,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import {
   Play,
   Pause,
-  RotateCcw,
+  SkipForward,
   Coffee,
   Moon,
   Flame,
@@ -138,6 +138,7 @@ const TimerScreen = () => {
   const [timeLeft, setTimeLeft] = useState(workSec); // default; synced below
   const [isActive, setIsActive] = useState(false);
   const [mode, setMode] = useState<Mode>('work');
+  const workCycleRef = useRef(0);
   const base = Math.min(winW, winH);
   const isLandscape = winW > winH;
   const isPortrait = !isLandscape;
@@ -195,18 +196,6 @@ const TimerScreen = () => {
     };
   }, [isActive, mode]);
 
-  useEffect(() => {
-    if (mode !== 'free' && timeLeft === 0) {
-      recordSession(mode, total);
-      setIsActive(false);
-      if (mode === 'work') {
-        setMode('short');
-      } else {
-        setMode('work');
-      }
-    }
-  }, [timeLeft, mode, recordSession, total]);
-
   // Sync timeLeft when mode or preset durations change
   useEffect(() => {
     setTimeLeft(mode === 'work' ? workSec : mode === 'short' ? shortSec : mode === 'long' ? longSec : 0);
@@ -259,14 +248,8 @@ const TimerScreen = () => {
     setIsActive(!isActive);
   };
 
-  const resetTimer = () => {
-    if (mode === 'free' && timeLeft > 0) {
-      // Treat free focus as a work session when finished
-      recordSession('work', timeLeft);
-    }
-    setIsActive(false);
-    setMode('work');
-    setTimeLeft(Math.max(1, prefs.workDuration) * 60);
+  const skipPhase = () => {
+    advancePhase(mode, { skip: true });
   };
 
   const handlePresetPress = (nextMode: Mode) => {
@@ -274,10 +257,58 @@ const TimerScreen = () => {
     if (mode === 'free' && nextMode !== 'free' && timeLeft > 0) {
       recordSession('work', timeLeft);
     }
+    if (nextMode === 'work') {
+      workCycleRef.current = 0;
+    }
     setMode(nextMode);
     setIsActive(false);
     setTimeLeft(nextMode === 'free' ? 0 : presetTimes[nextMode]);
   };
+
+  const advancePhase = useCallback(
+    (completed: Mode, opts?: { skip?: boolean }) => {
+      const skip = opts?.skip ?? false;
+
+      const duration =
+        completed === 'work' ? workSec :
+        completed === 'short' ? shortSec :
+        completed === 'long' ? longSec : 0;
+
+      if (!skip && completed !== 'free') {
+        recordSession(completed, duration);
+      }
+
+      let nextMode: Mode = 'work';
+
+      if (completed === 'work') {
+        const nextCount = workCycleRef.current + 1;
+        if (nextCount >= 4) {
+          workCycleRef.current = 0;
+          nextMode = 'long';
+        } else {
+          workCycleRef.current = nextCount;
+          nextMode = 'short';
+        }
+      } else if (completed === 'short') {
+        nextMode = 'work';
+      } else if (completed === 'long') {
+        workCycleRef.current = 0;
+        nextMode = 'work';
+      } else {
+        nextMode = 'work';
+      }
+
+      setIsActive(false);
+      setMode(nextMode);
+    },
+    [workSec, shortSec, longSec, recordSession]
+  );
+
+  useEffect(() => {
+    if (mode !== 'free' && timeLeft === 0) {
+      advancePhase(mode);
+    }
+  }, [timeLeft, mode, advancePhase]);
 
   const presetOptions: { key: Mode; label: string }[] = [
     { key: 'work', label: t('settings.work', uiLang) },
@@ -328,7 +359,7 @@ const TimerScreen = () => {
       // Timer controls
       if (key === ' ') { ev.preventDefault(); toggleTimer(); return; }
       if (key === 'k') { ev.preventDefault(); toggleTimer(); return; }
-      if (key === 'r') { ev.preventDefault(); resetTimer(); return; }
+      if (key === 'r') { ev.preventDefault(); skipPhase(); return; }
       if (key === '1') { handlePresetPress('work'); return; }
       if (key === '2') { handlePresetPress('short'); return; }
       if (key === '3') { handlePresetPress('long'); return; }
@@ -336,7 +367,7 @@ const TimerScreen = () => {
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [isWeb, router, toggleTimer, resetTimer, handlePresetPress]);
+  }, [isWeb, router, toggleTimer, skipPhase, handlePresetPress]);
 
   useEffect(() => {
     if (!isWeb || typeof document === 'undefined') return;
@@ -717,11 +748,11 @@ const TimerScreen = () => {
                 )}
               </TouchableOpacity>
               <TouchableOpacity
-                accessibilityLabel="Reset (R)"
-                onPress={resetTimer}
+                accessibilityLabel="Skip (R)"
+                onPress={skipPhase}
                 style={[styles.webDockBtn, { cursor: 'pointer' } as any]}
               >
-                <RotateCcw size={18} color={palette.primary} strokeWidth={2} />
+                <SkipForward size={18} color={palette.primary} strokeWidth={2} />
               </TouchableOpacity>
             </View>
             <View style={styles.webDockProgressBar}>
@@ -807,9 +838,9 @@ const TimerScreen = () => {
                       styles.playerControlButton,
                       { width: playerButtonSize, height: playerButtonSize, borderRadius: playerButtonSize / 2 },
                     ]}
-                    onPress={resetTimer}
+                    onPress={skipPhase}
                   >
-                    <RotateCcw size={controlIcon} color={palette.primary} strokeWidth={2} />
+                    <SkipForward size={controlIcon} color={palette.primary} strokeWidth={2} />
                   </TouchableOpacity>
                 </View>
               </View>
@@ -875,8 +906,8 @@ const TimerScreen = () => {
                   )}
                 </TouchableOpacity>
 
-                <TouchableOpacity style={[styles.controlButton, { width: buttonSize, height: buttonSize, borderRadius: buttonSize / 2 }]} onPress={resetTimer}>
-                  <RotateCcw size={controlIcon} color={palette.primary} strokeWidth={2} />
+                <TouchableOpacity style={[styles.controlButton, { width: buttonSize, height: buttonSize, borderRadius: buttonSize / 2 }]} onPress={skipPhase}>
+                  <SkipForward size={controlIcon} color={palette.primary} strokeWidth={2} />
                 </TouchableOpacity>
               </View>
 
@@ -890,10 +921,10 @@ const TimerScreen = () => {
           <View style={styles.shortcutOverlay}>
             <View style={styles.shortcutCard}>
               <Text style={styles.shortcutTitle}>Shortcuts</Text>
-              <Text style={styles.shortcutRow}>Space / K — Play or Pause</Text>
-              <Text style={styles.shortcutRow}>R — Reset timer</Text>
-              <Text style={styles.shortcutRow}>1 / 2 / 3 / 4 — Work / Short / Long / Free</Text>
-              <Text style={styles.shortcutRow}>S — Settings, T — Tasks, ? — Toggle help</Text>
+              <Text style={styles.shortcutRow}>Space / K - Play or Pause</Text>
+              <Text style={styles.shortcutRow}>R - Skip phase</Text>
+              <Text style={styles.shortcutRow}>1 / 2 / 3 / 4 - Work / Short / Long / Free</Text>
+              <Text style={styles.shortcutRow}>S - Settings, T - Tasks, ? - Toggle help</Text>
               <TouchableOpacity onPress={() => setShowShortcuts(false)} style={[styles.webDockBtn, { alignSelf: 'center', marginTop: vs(10) }]}>
                 <Text style={{ color: palette.primary, fontFamily: FONT_SEMIBOLD }}>Close</Text>
               </TouchableOpacity>
@@ -973,9 +1004,9 @@ const TimerScreen = () => {
                       styles.playerControlButton,
                       { width: playerButtonSize, height: playerButtonSize, borderRadius: playerButtonSize / 2 },
                     ]}
-                    onPress={resetTimer}
+                    onPress={skipPhase}
                   >
-                    <RotateCcw size={controlIcon} color={palette.primary} strokeWidth={2} />
+                    <SkipForward size={controlIcon} color={palette.primary} strokeWidth={2} />
                   </TouchableOpacity>
                 </View>
               </View>
@@ -1041,8 +1072,8 @@ const TimerScreen = () => {
                   )}
                 </TouchableOpacity>
 
-                <TouchableOpacity style={[styles.controlButton, { width: buttonSize, height: buttonSize, borderRadius: buttonSize / 2 }]} onPress={resetTimer}>
-                  <RotateCcw size={controlIcon} color={palette.primary} strokeWidth={2} />
+                <TouchableOpacity style={[styles.controlButton, { width: buttonSize, height: buttonSize, borderRadius: buttonSize / 2 }]} onPress={skipPhase}>
+                  <SkipForward size={controlIcon} color={palette.primary} strokeWidth={2} />
                 </TouchableOpacity>
               </View>
 
@@ -1404,7 +1435,7 @@ const makeStyles = (palette: any) => StyleSheet.create({
     fontFamily: FONT_SEMIBOLD,
     fontSize: ms(11),
     color: '#FFFFFF',
-    letterSpacing: 1,
+    letterSpacing: 0.5,
     textAlign: 'center',
     textTransform: 'uppercase',
     alignSelf: 'stretch',
@@ -1412,6 +1443,7 @@ const makeStyles = (palette: any) => StyleSheet.create({
     paddingHorizontal: s(4),
     marginBottom: vs(4),
     flexShrink: 1,
+    lineHeight: ms(12),
   },
   scoreValue: {
     fontFamily: FONT_BOLD,
