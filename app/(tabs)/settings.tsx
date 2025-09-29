@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   Switch,
   Alert,
+  Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { s, vs, ms } from '@/lib/responsive';
@@ -246,18 +247,26 @@ export default function SettingsScreen() {
     confirmKey: string,
     action: () => void
   ) => {
-    Alert.alert(
-      t(titleKey, uiLang),
-      t(messageKey, uiLang),
-      [
-        { text: t('common.cancel', uiLang), style: 'cancel' },
-        {
-          text: t(confirmKey, uiLang),
-          style: 'destructive',
-          onPress: action,
-        },
-      ],
-    );
+    const title = t(titleKey, uiLang);
+    const message = t(messageKey, uiLang);
+    const confirmLabel = t(confirmKey, uiLang);
+
+    if (Platform.OS === 'web') {
+      const globalConfirm =
+        typeof globalThis !== 'undefined' && typeof (globalThis as any).confirm === 'function'
+          ? (globalThis as any).confirm
+          : undefined;
+      const ok = globalConfirm ? globalConfirm(`${title}
+
+${message}`) : true;
+      if (ok) action();
+      return;
+    }
+
+    Alert.alert(title, message, [
+      { text: t('common.cancel', uiLang), style: 'cancel' },
+      { text: confirmLabel, style: 'destructive', onPress: action },
+    ]);
   };
 
   const handleResetStats = () =>
@@ -265,7 +274,12 @@ export default function SettingsScreen() {
       'settings.resetStats',
       'settings.resetStatsConfirm',
       'settings.resetStatsConfirmButton',
-      resetStats
+      () => {
+        resetStats();
+        resetWorkday();
+        resetAchievements();
+        resetTasks();
+      }
     );
 
   const handleResetWorkday = () =>

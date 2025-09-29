@@ -98,6 +98,15 @@ const DEFAULT_STATS: SessionStats = {
   completedSessions: [],
 };
 
+function cloneDefaultStats(): SessionStats {
+  return {
+    ...DEFAULT_STATS,
+    totals: { ...DEFAULT_STATS.totals },
+    unlockedAchievements: { ...DEFAULT_STATS.unlockedAchievements },
+    completedSessions: [...DEFAULT_STATS.completedSessions],
+  };
+}
+
 const KEY = 'session_stats_v2'; // Incremented version due to data structure change
 const MAX_SESSION_LOG = 100;
 
@@ -287,11 +296,9 @@ export function SessionStatsProvider({ children }: { children: React.ReactNode }
   );
 
   const resetStats = useCallback(() => {
-    setStats(() => {
-      const next = { ...DEFAULT_STATS };
-      AsyncStorage.setItem(KEY, JSON.stringify(next)).catch(() => {});
-      return next;
-    });
+    const next = cloneDefaultStats();
+    setStats(next);
+    AsyncStorage.setItem(KEY, JSON.stringify(next)).catch(() => {});
   }, []);
 
   const resetWorkday = useCallback(() => {
