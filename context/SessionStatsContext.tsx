@@ -106,6 +106,8 @@ type SessionStatsCtx = {
   ready: boolean;
   recordSession: (mode: SessionMode, durationSeconds: number, completedAt?: Date) => void;
   resetStats: () => void;
+  resetWorkday: () => void;
+  resetAchievements: () => void;
   achievementStates: AchievementState[];
 };
 
@@ -292,6 +294,26 @@ export function SessionStatsProvider({ children }: { children: React.ReactNode }
     });
   }, []);
 
+  const resetWorkday = useCallback(() => {
+    updateStats(prev => ({
+      ...prev,
+      currentStreakDays: 0,
+      currentScoreStreak: 0,
+      lastWorkDate: null,
+      lastSessionDate: null,
+    }));
+  }, [updateStats]);
+
+  const resetAchievements = useCallback(() => {
+    updateStats(prev => ({
+      ...prev,
+      unlockedAchievements: { ...DEFAULT_STATS.unlockedAchievements },
+      totalScore: 0,
+      currentScoreStreak: 0,
+      bestScoreStreak: 0,
+    }));
+  }, [updateStats]);
+
   const achievementStates = useMemo(() => buildAchievementStates(stats), [stats]);
 
   const value = useMemo<SessionStatsCtx>(() => ({
@@ -299,8 +321,10 @@ export function SessionStatsProvider({ children }: { children: React.ReactNode }
     ready,
     recordSession,
     resetStats,
+    resetWorkday,
+    resetAchievements,
     achievementStates,
-  }), [stats, ready, recordSession, resetStats, achievementStates]);
+  }), [stats, ready, recordSession, resetStats, resetWorkday, resetAchievements, achievementStates]);
 
   return <SessionStatsContext.Provider value={value}>{children}</SessionStatsContext.Provider>;
 }

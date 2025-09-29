@@ -381,7 +381,7 @@ const TimerScreen = () => {
         nextMode = 'work';
       }
 
-      setIsActive(false);
+      setIsActive(true);
       setMode(nextMode);
     },
     [workSec, shortSec, longSec, recordSession, presetTimes]

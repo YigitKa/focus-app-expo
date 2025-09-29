@@ -6,59 +6,42 @@ import {
   FlatList,
   TouchableOpacity,
   TextInput,
-  Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Plus, Check, X } from 'lucide-react-native';
 import { s, vs, ms } from '@/lib/responsive';
 import { t, resolveLang } from '@/lib/i18n';
 import { usePrefs } from '@/context/PrefsContext';
+import { useTasks, Task } from '@/context/TasksContext';
 import { useTheme } from '@/context/ThemeContext';
 const FONT_REGULAR = 'Poppins-Regular';
 const FONT_MEDIUM = 'Poppins-Medium';
 const FONT_SEMIBOLD = 'Poppins-SemiBold';
 const FONT_BOLD = 'Poppins-Bold';
 
-interface Task {
-  id: string;
-  title: string;
-  completed: boolean;
-  createdAt: Date;
-}
-
 export default function TasksScreen() {
   const { prefs } = usePrefs();
   const uiLang = resolveLang(prefs.language);
   const { theme } = useTheme();
   const palette = theme.colors;
-  const [tasks, setTasks] = useState<Task[]>([]);
+  const { tasks, addTask: addTaskToStore, toggleTask: toggleTaskInStore, deleteTask: deleteTaskFromStore } = useTasks();
   const [newTaskText, setNewTaskText] = useState('');
   const [isAddingTask, setIsAddingTask] = useState(false);
 
   const addTask = () => {
     if (newTaskText.trim()) {
-      const newTask: Task = {
-        id: Date.now().toString(),
-        title: newTaskText.trim(),
-        completed: false,
-        createdAt: new Date(),
-      };
-      setTasks(prev => [newTask, ...prev]);
+      addTaskToStore(newTaskText);
       setNewTaskText('');
       setIsAddingTask(false);
     }
   };
 
   const toggleTask = (id: string) => {
-    setTasks(prev => 
-      prev.map(task => 
-        task.id === id ? { ...task, completed: !task.completed } : task
-      )
-    );
+    toggleTaskInStore(id);
   };
 
   const deleteTask = (id: string) => {
-    setTasks(prev => prev.filter(task => task.id !== id));
+    deleteTaskFromStore(id);
   };
 
   const completedCount = tasks.filter(task => task.completed).length;

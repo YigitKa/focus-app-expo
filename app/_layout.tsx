@@ -8,6 +8,7 @@ import { useFrameworkReady } from '@/hooks/useFrameworkReady';
 import { PrefsProvider } from '@/context/PrefsContext';
 import { SessionStatsProvider } from '@/context/SessionStatsContext';
 import { ThemeProvider } from '@/context/ThemeContext';
+import { TasksProvider } from '@/context/TasksContext';
 
 export default function RootLayout() {
   const [fontsLoaded, fontError] = useFonts({
@@ -41,10 +42,12 @@ export default function RootLayout() {
     <SessionStatsProvider>
       <PrefsProvider>
         <ThemeProvider>
-          <Stack screenOptions={{ headerShown: false }}>
-            <Stack.Screen name="+not-found" />
-          </Stack>
-          <StatusBar style="auto" />
+          <TasksProvider>
+            <Stack screenOptions={{ headerShown: false }}>
+              <Stack.Screen name="+not-found" />
+            </Stack>
+            <StatusBar style="auto" />
+          </TasksProvider>
         </ThemeProvider>
       </PrefsProvider>
     </SessionStatsProvider>

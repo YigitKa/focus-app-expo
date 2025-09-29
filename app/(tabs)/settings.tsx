@@ -13,6 +13,7 @@ import { s, vs, ms } from '@/lib/responsive';
 import { t, resolveLang } from '@/lib/i18n';
 import { usePrefs } from '@/context/PrefsContext';
 import { useSessionStats } from '@/context/SessionStatsContext';
+import { useTasks } from '@/context/TasksContext';
 import { Volume2, VolumeX, Vibrate, Bell, Clock, Settings2 } from 'lucide-react-native';
 import { useTheme } from '@/context/ThemeContext';
 import { Palette } from '@/lib/theme';
@@ -81,13 +82,16 @@ const getStyles = (palette: Palette) => StyleSheet.create({
     fontWeight: 'bold',
   },
   resetButton: {
-    marginTop: vs(16),
+    marginTop: vs(12),
     paddingVertical: vs(10),
     alignItems: 'center',
     borderRadius: 8,
     borderWidth: 1,
     borderColor: palette.warning,
     backgroundColor: palette.background3,
+  },
+  resetButtonFirst: {
+    marginTop: 0,
   },
   resetButtonText: {
     fontFamily: 'Courier New',
@@ -207,7 +211,8 @@ const getStyles = (palette: Palette) => StyleSheet.create({
 
 export default function SettingsScreen() {
   const { prefs, updatePrefs } = usePrefs();
-  const { resetStats } = useSessionStats();
+  const { resetStats, resetWorkday, resetAchievements } = useSessionStats();
+  const { resetTasks } = useTasks();
   const uiLang = resolveLang(prefs.language);
   const { theme, name: themeName, setThemeName } = useTheme();
   const palette = theme.colors;
@@ -235,20 +240,57 @@ export default function SettingsScreen() {
     setSettings(prev => ({ ...prev, [key]: value }));
   };
 
-  const handleResetStats = () => {
+  const confirmReset = (
+    titleKey: string,
+    messageKey: string,
+    confirmKey: string,
+    action: () => void
+  ) => {
     Alert.alert(
-      t('settings.resetStats', uiLang),
-      t('settings.resetStatsConfirm', uiLang),
+      t(titleKey, uiLang),
+      t(messageKey, uiLang),
       [
         { text: t('common.cancel', uiLang), style: 'cancel' },
         {
-          text: t('settings.resetStatsConfirmButton', uiLang),
+          text: t(confirmKey, uiLang),
           style: 'destructive',
-          onPress: () => resetStats(),
+          onPress: action,
         },
       ],
     );
   };
+
+  const handleResetStats = () =>
+    confirmReset(
+      'settings.resetStats',
+      'settings.resetStatsConfirm',
+      'settings.resetStatsConfirmButton',
+      resetStats
+    );
+
+  const handleResetWorkday = () =>
+    confirmReset(
+      'settings.resetWorkday',
+      'settings.resetWorkdayConfirm',
+      'settings.resetWorkdayConfirmButton',
+      resetWorkday
+    );
+
+  const handleResetAchievements = () =>
+    confirmReset(
+      'settings.resetAchievements',
+      'settings.resetAchievementsConfirm',
+      'settings.resetAchievementsConfirmButton',
+      resetAchievements
+    );
+
+  const handleResetTasks = () =>
+    confirmReset(
+      'settings.resetTasks',
+      'settings.resetTasksConfirm',
+      'settings.resetTasksConfirmButton',
+      resetTasks
+    );
 
   const SettingRow = ({ 
     icon, 
@@ -449,8 +491,20 @@ export default function SettingsScreen() {
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>{t('settings.data', uiLang)}</Text>
-          <TouchableOpacity style={styles.resetButton} onPress={handleResetStats}>
+          <TouchableOpacity
+            style={[styles.resetButton, styles.resetButtonFirst]}
+            onPress={handleResetStats}
+          >
             <Text style={styles.resetButtonText}>{t('settings.resetStats', uiLang)}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.resetButton} onPress={handleResetWorkday}>
+            <Text style={styles.resetButtonText}>{t('settings.resetWorkday', uiLang)}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.resetButton} onPress={handleResetAchievements}>
+            <Text style={styles.resetButtonText}>{t('settings.resetAchievements', uiLang)}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.resetButton} onPress={handleResetTasks}>
+            <Text style={styles.resetButtonText}>{t('settings.resetTasks', uiLang)}</Text>
           </TouchableOpacity>
         </View>
 
