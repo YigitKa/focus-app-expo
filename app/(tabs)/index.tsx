@@ -42,7 +42,7 @@ const TimerScreen = () => {
   const { width: winW, height: winH } = useWindowDimensions();
   const { prefs } = usePrefs();
   const uiLang = resolveLang(prefs.language);
-  const { stats: sessionStats, recordSession, achievementStates, difficulty } = useSessionStats();
+  const { stats: sessionStats, recordSession, achievementStates } = useSessionStats();
   const router = useRouter();
   const { theme } = useTheme();
   const palette = theme.colors;
@@ -58,7 +58,6 @@ const TimerScreen = () => {
   };
 
   const scoreItems: ScoreItem[] = useMemo(() => {
-    // Larger icons in tiles
     const iconSize = msc(26, 20, 30);
     return [
       {
@@ -135,7 +134,7 @@ const TimerScreen = () => {
     free: 0, // counts up
   };
 
-  const [timeLeft, setTimeLeft] = useState(workSec); // default; synced below
+  const [timeLeft, setTimeLeft] = useState(workSec);
   const [isActive, setIsActive] = useState(false);
   const [mode, setMode] = useState<Mode>('work');
   const workCycleRef = useRef(0);
@@ -144,10 +143,9 @@ const TimerScreen = () => {
   const isPortrait = !isLandscape;
   const isCompact = isPortrait ? winW < 420 : winH < 540 || winW < 640;
   const isWeb = Platform.OS === 'web';
-  const webDockHeight = 56; // sticky pro bar height on web
+  const webDockHeight = 56;
   const usePlayerLayout = isLandscape;
   const baseTitleRef = useRef<string | null>(null);
-  // Make the ring smaller while enlarging time text later
   const circleSize = clamp(
     base * (isCompact && isPortrait ? 0.36 : 0.44),
     isCompact && isPortrait ? 130 : 200,
@@ -157,7 +155,6 @@ const TimerScreen = () => {
   const buttonSize = isCompact || usePlayerLayout ? clamp(s(56), 50, 80) : clamp(s(64), 56, 84);
   const titleSize = usePlayerLayout ? msc(24, 18, 30) : isCompact ? msc(22, 16, 26) : msc(28, 18, 30);
   const subtitleSize = usePlayerLayout ? msc(13, 11, 18) : isCompact ? msc(12, 10, 16) : msc(14, 12, 18);
-  // Bigger time text
   const timeSize = usePlayerLayout ? msc(44, 34, 56) : isCompact ? msc(40, 30, 52) : msc(52, 36, 64);
   const presetWidth = usePlayerLayout
     ? clamp(base * 0.28, 120, 200)
@@ -170,7 +167,7 @@ const TimerScreen = () => {
     usePlayerLayout ? 420 : 320,
     usePlayerLayout ? 880 : 560
   );
-  const playerButtonSize = clamp(s(usePlayerLayout ? 56 : 48), usePlayerLayout ? 52 : 44, usePlayerLayout ? 74 : 60);
+  const playerButtonSize = clamp(s(usePlayerLayout ? 56 : 48), usePlayerLayout ? 44 : 44, usePlayerLayout ? 74 : 60);
   const useScrollPresets = !usePlayerLayout && isCompact;
   const playerContainerGap = vs(usePlayerLayout ? 20 : 16);
   const playerContainerMarginTop = vs(usePlayerLayout ? 24 : 12);
@@ -196,7 +193,6 @@ const TimerScreen = () => {
     };
   }, [isActive, mode]);
 
-  // Sync timeLeft when mode or preset durations change
   useEffect(() => {
     setTimeLeft(mode === 'work' ? workSec : mode === 'short' ? shortSec : mode === 'long' ? longSec : 0);
   }, [mode, workSec, shortSec, longSec]);
@@ -253,7 +249,6 @@ const TimerScreen = () => {
   };
 
   const handlePresetPress = (nextMode: Mode) => {
-    // If leaving free mode with elapsed time, record it as work
     if (mode === 'free' && nextMode !== 'free' && timeLeft > 0) {
       recordSession('work', timeLeft);
     }
@@ -323,7 +318,6 @@ const TimerScreen = () => {
       onPress={() => handlePresetPress(key)}
       style={[
         styles.presetButton,
-        // Equal-width grid when not using the horizontal scroller
         useScrollPresets ? { width: presetWidth } : styles.presetButtonEqual,
         isCompact && styles.presetButtonCompact,
         mode === key && styles.presetActive,
@@ -342,21 +336,18 @@ const TimerScreen = () => {
   ));
   const [showShortcuts, setShowShortcuts] = useState(false);
 
-  // Keyboard shortcuts for web (experienced use)
   useEffect(() => {
     if (!isWeb) return;
     const onKeyDown = (ev: any) => {
       const key = (ev?.key || '').toLowerCase();
       const tag = (ev?.target?.tagName || '').toLowerCase();
       const editable = tag === 'input' || tag === 'textarea' || tag === 'select' || ev?.target?.isContentEditable;
-      if (editable) return; // don't hijack typing
+      if (editable) return;
 
-      // Navigation
       if (key === 's') { router.push('/(tabs)/settings'); return; }
       if (key === 't') { router.push('/(tabs)/tasks'); return; }
       if (key === '?') { setShowShortcuts(prev => !prev); return; }
 
-      // Timer controls
       if (key === ' ') { ev.preventDefault(); toggleTimer(); return; }
       if (key === 'k') { ev.preventDefault(); toggleTimer(); return; }
       if (key === 'r') { ev.preventDefault(); skipPhase(); return; }
@@ -389,9 +380,6 @@ const TimerScreen = () => {
     document.title = `${formattedRemaining} - ${statusLabel} - ${baseTitle}`;
   }, [isWeb, timeLeft, isBreak, uiLang]);
 
-  // Shortcuts help overlay state handled above
-
-  // Fixed 4x2 grid for the scoreboard
   const portraitColumns = 4;
   const portraitBasis = '23%';
 
@@ -581,10 +569,6 @@ const TimerScreen = () => {
         <View style={styles.statsHeader}>
           <Text style={styles.statsTitle}>{t('stats.title', uiLang)}</Text>
           <Text style={styles.statsSubtitle}>{t('stats.subtitle', uiLang)}</Text>
-          <View style={styles.difficultyBadge}>
-            <Text style={styles.difficultyLabel}>{t('stats.difficulty', uiLang)}</Text>
-            <Text style={styles.difficultyValue}>{t(`difficulty.${difficulty}`, uiLang)}</Text>
-          </View>
         </View>
   
         <View style={styles.content}>
@@ -726,7 +710,6 @@ const TimerScreen = () => {
       <View style={styles.gridOverlay} />
       {isWeb ? (
         <>
-          {/* Sticky pro bar for web */}
           <View
             style={[
               styles.webDock,
@@ -761,7 +744,6 @@ const TimerScreen = () => {
               />
             </View>
           </View>
-          {/* Main scrollable content (offset for dock) */}
         <ScrollView
           style={styles.webScroll}
           contentContainerStyle={[styles.webScrollContent, { paddingTop: webDockHeight + vs(8) }]}
@@ -916,7 +898,6 @@ const TimerScreen = () => {
           )}
           <StatsSection />
         </ScrollView>
-        {/* Shortcuts overlay */}
         {showShortcuts && (
           <View style={styles.shortcutOverlay}>
             <View style={styles.shortcutCard}>
@@ -1107,13 +1088,12 @@ const makeStyles = (palette: any) => StyleSheet.create({
     paddingHorizontal: s(16),
     paddingVertical: vs(12),
   },
-  // Scroll wrapper for web to enable vertical scrolling
   webScroll: {
     flex: 1,
     width: '100%',
   },
   webScrollContent: {
-    paddingBottom: vs(80), // leave room above the tab bar
+    paddingBottom: vs(80),
   },
   gridOverlay: {
     position: 'absolute',
@@ -1143,29 +1123,6 @@ const makeStyles = (palette: any) => StyleSheet.create({
     fontFamily: FONT_SEMIBOLD,
     fontSize: ms(12),
     color: '#C3C7FF',
-    letterSpacing: 1,
-  },
-  difficultyBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: s(8),
-    paddingHorizontal: s(14),
-    paddingVertical: vs(6),
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#00FFFF',
-    backgroundColor: 'rgba(0,255,255,0.15)',
-  },
-  difficultyLabel: {
-    fontFamily: FONT_SEMIBOLD,
-    fontSize: ms(10),
-    color: '#00FFFF',
-    letterSpacing: 1,
-  },
-  difficultyValue: {
-    fontFamily: FONT_BOLD,
-    fontSize: ms(12),
-    color: '#FFFF00',
     letterSpacing: 1,
   },
   headerCompact: {
@@ -1200,7 +1157,6 @@ const makeStyles = (palette: any) => StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  // Equal-width preset buttons for wide screens (web/tablet)
   presetButtonEqual: {
     flexGrow: 1,
     flexBasis: '24%',
@@ -1606,7 +1562,6 @@ const makeStyles = (palette: any) => StyleSheet.create({
     color: '#666699',
     textAlign: 'center',
   },
-  // Web pro dock (sticky header)
   webDock: {
     position: 'absolute',
     top: 0,
@@ -1660,7 +1615,6 @@ const makeStyles = (palette: any) => StyleSheet.create({
   webDockProgressFill: {
     height: '100%',
   },
-  // Shortcuts overlay
   shortcutOverlay: {
     position: 'absolute',
     top: 0,
@@ -1696,6 +1650,3 @@ const makeStyles = (palette: any) => StyleSheet.create({
     marginBottom: vs(4),
   },
 });
-
-
-

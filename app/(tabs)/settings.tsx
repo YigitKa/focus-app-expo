@@ -12,21 +12,206 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { s, vs, ms } from '@/lib/responsive';
 import { t, resolveLang } from '@/lib/i18n';
 import { usePrefs } from '@/context/PrefsContext';
-import { useSessionStats, DifficultyLevel } from '@/context/SessionStatsContext';
+import { useSessionStats } from '@/context/SessionStatsContext';
 import { Volume2, VolumeX, Vibrate, Bell, Clock, Settings2 } from 'lucide-react-native';
 import { useTheme } from '@/context/ThemeContext';
-const FONT_REGULAR = 'Poppins-Regular';
-const FONT_MEDIUM = 'Poppins-Medium';
-const FONT_SEMIBOLD = 'Poppins-SemiBold';
-const FONT_BOLD = 'Poppins-Bold';
+import { Palette } from '@/lib/theme';
+
+const getStyles = (palette: Palette) => StyleSheet.create({
+  container: {
+    flex: 1,
+    paddingTop: vs(48),
+  },
+  header: {
+    alignItems: 'center',
+    paddingVertical: vs(16),
+  },
+  title: {
+    fontFamily: 'Courier New',
+    fontSize: ms(22),
+    fontWeight: 'bold',
+    color: palette.success,
+    letterSpacing: 2,
+  },
+  subtitle: {
+    fontFamily: 'Courier New',
+    fontSize: ms(12),
+    color: palette.text,
+    letterSpacing: 1,
+    marginTop: 8,
+  },
+  content: {
+    flex: 1,
+    paddingHorizontal: s(16),
+  },
+  section: {
+    marginBottom: vs(20),
+  },
+  sectionTitle: {
+    fontFamily: 'Courier New',
+    fontSize: ms(14),
+    fontWeight: 'bold',
+    color: palette.secondary,
+    letterSpacing: 1,
+    marginBottom: vs(12),
+  },
+  languageRow: {
+    flexDirection: 'row',
+    gap: s(8),
+  },
+  langPill: {
+    backgroundColor: palette.background2,
+    borderWidth: 1,
+    borderColor: palette.border,
+    borderRadius: 16,
+    paddingHorizontal: s(10),
+    paddingVertical: s(6),
+  },
+  langPillActive: {
+    borderColor: palette.primary,
+    backgroundColor: palette.background3,
+  },
+  langText: {
+    fontFamily: 'Courier New',
+    fontSize: ms(12),
+    color: palette.text,
+  },
+  langTextActive: {
+    color: palette.primary,
+    fontWeight: 'bold',
+  },
+  resetButton: {
+    marginTop: vs(16),
+    paddingVertical: vs(10),
+    alignItems: 'center',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: palette.warning,
+    backgroundColor: palette.background3,
+  },
+  resetButtonText: {
+    fontFamily: 'Courier New',
+    fontSize: ms(12),
+    fontWeight: 'bold',
+    color: palette.warning,
+    letterSpacing: 1,
+  },
+  settingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: palette.background2,
+    borderWidth: 1,
+    borderColor: palette.border,
+    borderRadius: 8,
+    padding: s(12),
+    marginBottom: vs(10),
+  },
+  settingIcon: {
+    marginRight: s(12),
+  },
+  settingContent: {
+    flex: 1,
+  },
+  settingTitle: {
+    fontFamily: 'Courier New',
+    fontSize: ms(12),
+    fontWeight: 'bold',
+    color: palette.textEmphasis,
+    letterSpacing: 1,
+  },
+  settingSubtitle: {
+    fontFamily: 'Courier New',
+    fontSize: ms(11),
+    color: palette.text,
+    marginTop: 4,
+  },
+  switch: {
+    transform: [{ scaleX: 1.2 }, { scaleY: 1.2 }],
+  },
+  timerSetting: {
+    backgroundColor: palette.background2,
+    borderWidth: 1,
+    borderColor: palette.border,
+    borderRadius: 8,
+    padding: s(12),
+    marginBottom: vs(10),
+  },
+  timerTitle: {
+    fontFamily: 'Courier New',
+    fontSize: ms(12),
+    fontWeight: 'bold',
+    color: palette.textEmphasis,
+    letterSpacing: 1,
+    marginBottom: vs(8),
+  },
+  timerControls: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  timerButton: {
+    width: ms(36),
+    height: ms(36),
+    backgroundColor: palette.background3,
+    borderWidth: 2,
+    borderColor: palette.secondary,
+    borderRadius: ms(18),
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  timerButtonText: {
+    fontFamily: 'Courier New',
+    fontSize: ms(18),
+    fontWeight: 'bold',
+    color: palette.secondary,
+  },
+  timerValue: {
+    fontFamily: 'Courier New',
+    fontSize: ms(16),
+    fontWeight: 'bold',
+    color: palette.accent,
+    letterSpacing: 1,
+  },
+  aboutCard: {
+    backgroundColor: palette.background3,
+    borderWidth: 2,
+    borderColor: palette.primary,
+    borderRadius: 12,
+    padding: s(16),
+    alignItems: 'center',
+  },
+  aboutTitle: {
+    fontFamily: 'Courier New',
+    fontSize: ms(16),
+    fontWeight: 'bold',
+    color: palette.primary,
+    letterSpacing: 2,
+    marginTop: vs(10),
+    marginBottom: vs(8),
+  },
+  aboutText: {
+    fontFamily: 'Courier New',
+    fontSize: ms(12),
+    color: palette.textEmphasis,
+    textAlign: 'center',
+    lineHeight: vs(18),
+    marginBottom: vs(10),
+  },
+  aboutSubtext: {
+    fontFamily: 'Courier New',
+    fontSize: ms(11),
+    color: palette.text,
+    letterSpacing: 1,
+  },
+});
 
 export default function SettingsScreen() {
   const { prefs, updatePrefs } = usePrefs();
-  const { difficulty, setAchievementDifficulty, resetStats } = useSessionStats();
+  const { resetStats } = useSessionStats();
   const uiLang = resolveLang(prefs.language);
   const { theme, name: themeName, setThemeName } = useTheme();
   const palette = theme.colors;
-  const difficultyOptions: DifficultyLevel[] = ['easy', 'normal', 'hard'];
+  const styles = getStyles(palette);
   const [settings, setSettings] = useState({
     soundEnabled: true,
     vibrateEnabled: true,
@@ -37,7 +222,6 @@ export default function SettingsScreen() {
     longBreakDuration: 15,
   });
 
-  // Sync local UI state with persisted prefs (for timer durations)
   useEffect(() => {
     setSettings(prev => ({
       ...prev,
@@ -51,12 +235,6 @@ export default function SettingsScreen() {
     setSettings(prev => ({ ...prev, [key]: value }));
   };
 
-  const handleDifficultySelect = (level: DifficultyLevel) => {
-    if (level !== difficulty) {
-      setAchievementDifficulty(level);
-    }
-  };
-
   const handleResetStats = () => {
     Alert.alert(
       t('settings.resetStats', uiLang),
@@ -66,7 +244,7 @@ export default function SettingsScreen() {
         {
           text: t('settings.resetStatsConfirmButton', uiLang),
           style: 'destructive',
-          onPress: () => resetStats({ keepDifficulty: true }),
+          onPress: () => resetStats(),
         },
       ],
     );
@@ -77,37 +255,27 @@ export default function SettingsScreen() {
     title, 
     subtitle, 
     value, 
-    onToggle, 
-    type = 'switch' 
+    onToggle 
   }: {
     icon: React.ReactNode;
     title: string;
     subtitle: string;
-    value: boolean | number;
+    value: boolean;
     onToggle: () => void;
-    type?: 'switch' | 'button';
   }) => (
     <View style={styles.settingRow}>
-      <View style={styles.settingIcon}>
-        {icon}
-      </View>
+      <View style={styles.settingIcon}>{icon}</View>
       <View style={styles.settingContent}>
         <Text style={styles.settingTitle}>{title}</Text>
         <Text style={styles.settingSubtitle}>{subtitle}</Text>
       </View>
-      {type === 'switch' ? (
-        <Switch
-          value={value as boolean}
-          onValueChange={onToggle}
-          trackColor={{ false: '#333366', true: '#FF00FF' }}
-          thumbColor={value ? '#00FFFF' : '#666699'}
-          style={styles.switch}
-        />
-      ) : (
-        <TouchableOpacity style={styles.valueButton} onPress={onToggle}>
-          <Text style={styles.valueText}>{value}</Text>
-        </TouchableOpacity>
-      )}
+      <Switch
+        value={value}
+        onValueChange={onToggle}
+        trackColor={{ false: palette.border, true: palette.secondary }}
+        thumbColor={value ? palette.primary : palette.background3}
+        style={styles.switch}
+      />
     </View>
   );
 
@@ -137,12 +305,10 @@ export default function SettingsScreen() {
   );
 
   return (
-    <LinearGradient colors={theme.gradient} style={[styles.container, { backgroundColor: palette.background }]}>
-      <View style={styles.gridOverlay} />
-      
+    <LinearGradient colors={theme.gradient} style={styles.container}>
       <View style={styles.header}>
-        <Text style={[styles.title, { color: palette.success }]}>{t('settings.title', uiLang)}</Text>
-        <Text style={[styles.subtitle, { color: palette.text }]}>{t('settings.subtitle', uiLang)}</Text>
+        <Text style={styles.title}>{t('settings.title', uiLang)}</Text>
+        <Text style={styles.subtitle}>{t('settings.subtitle', uiLang)}</Text>
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
@@ -177,12 +343,29 @@ export default function SettingsScreen() {
         </View>
 
         <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Theme</Text>
+          <View style={styles.languageRow}>
+            {(['nova', 'retro', 'arctic'] as const).map(opt => (
+              <TouchableOpacity
+                key={opt}
+                onPress={() => setThemeName(opt)}
+                style={[styles.langPill, themeName === opt && styles.langPillActive]}
+              >
+                <Text style={[styles.langText, themeName === opt && styles.langTextActive]}>
+                  {opt.charAt(0).toUpperCase() + opt.slice(1)}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+
+        <View style={styles.section}>
           <Text style={styles.sectionTitle}>{t('settings.audio', uiLang)}</Text>
           
           <SettingRow
             icon={settings.soundEnabled ? 
-              <Volume2 size={24} color="#00FFFF" strokeWidth={2} /> :
-              <VolumeX size={24} color="#666699" strokeWidth={2} />
+              <Volume2 size={24} color={palette.primary} strokeWidth={2} /> :
+              <VolumeX size={24} color={palette.text} strokeWidth={2} />
             }
             title={t('settings.sound', uiLang)}
             subtitle="Play audio notifications"
@@ -191,7 +374,7 @@ export default function SettingsScreen() {
           />
 
           <SettingRow
-            icon={<Vibrate size={24} color="#FF00FF" strokeWidth={2} />}
+            icon={<Vibrate size={24} color={palette.secondary} strokeWidth={2} />}
             title={t('settings.haptics', uiLang)}
             subtitle="Vibrate on timer events"
             value={settings.vibrateEnabled}
@@ -199,7 +382,7 @@ export default function SettingsScreen() {
           />
 
           <SettingRow
-            icon={<Bell size={24} color="#FFFF00" strokeWidth={2} />}
+            icon={<Bell size={24} color={palette.accent} strokeWidth={2} />}
             title={t('settings.notifications', uiLang)}
             subtitle="Push notifications for breaks"
             value={settings.notificationsEnabled}
@@ -211,7 +394,7 @@ export default function SettingsScreen() {
           <Text style={styles.sectionTitle}>{t('settings.timers', uiLang)}</Text>
           
           <SettingRow
-            icon={<Clock size={24} color="#00FF66" strokeWidth={2} />}
+            icon={<Clock size={24} color={palette.success} strokeWidth={2} />}
             title={t('settings.autoBreaks', uiLang)}
             subtitle="Automatically start break timers"
             value={settings.autoBreaks}
@@ -265,56 +448,17 @@ export default function SettingsScreen() {
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>{t('settings.achievementDifficulty', uiLang)}</Text>
-          <View style={styles.difficultyRow}>
-            {difficultyOptions.map(level => (
-              <TouchableOpacity
-                key={level}
-                onPress={() => handleDifficultySelect(level)}
-                style={[
-                  styles.difficultyPill,
-                  difficulty === level && styles.difficultyPillActive,
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.difficultyText,
-                    difficulty === level && styles.difficultyTextActive,
-                  ]}
-                >
-                  {t(`difficulty.${level}`, uiLang)}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
+          <Text style={styles.sectionTitle}>{t('settings.data', uiLang)}</Text>
           <TouchableOpacity style={styles.resetButton} onPress={handleResetStats}>
             <Text style={styles.resetButtonText}>{t('settings.resetStats', uiLang)}</Text>
           </TouchableOpacity>
-          <Text style={styles.resetHint}>{t('settings.resetStatsHint', uiLang)}</Text>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Tema</Text>
-          <View style={styles.languageRow}>
-            {(['nova','retro'] as const).map(opt => (
-              <TouchableOpacity
-                key={opt}
-                onPress={() => setThemeName(opt)}
-                style={[styles.langPill, themeName === opt && styles.langPillActive]}
-              >
-                <Text style={[styles.langText, themeName === opt && styles.langTextActive]}>
-                  {opt === 'nova' ? 'Modern' : 'Retro'}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
         </View>
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>{t('settings.about', uiLang)}</Text>
           
           <View style={styles.aboutCard}>
-            <Settings2 size={32} color="#00FFFF" strokeWidth={2} />
+            <Settings2 size={32} color={palette.primary} strokeWidth={2} />
             <Text style={styles.aboutTitle}>RETRO FOCUS v1.0</Text>
             <Text style={styles.aboutText}>{t('about.text', uiLang)}</Text>
             <Text style={styles.aboutSubtext}>{t('about.subtext', uiLang)}</Text>
@@ -324,243 +468,3 @@ export default function SettingsScreen() {
     </LinearGradient>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    paddingTop: vs(48),
-  },
-  gridOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-  },
-  header: {
-    alignItems: 'center',
-    paddingVertical: vs(16),
-  },
-  title: {
-    fontFamily: FONT_BOLD,
-    fontSize: ms(22),
-    color: '#00FF66',
-    letterSpacing: 2,
-    textShadowColor: 'transparent',
-    textShadowRadius: 0,
-  },
-  subtitle: {
-    fontFamily: FONT_SEMIBOLD,
-    fontSize: ms(12),
-    color: '#666699',
-    letterSpacing: 1,
-    marginTop: 8,
-  },
-  content: {
-    flex: 1,
-    paddingHorizontal: s(16),
-  },
-  section: {
-    marginBottom: vs(20),
-  },
-  sectionTitle: {
-    fontFamily: FONT_BOLD,
-    fontSize: ms(14),
-    color: '#FF00FF',
-    letterSpacing: 1,
-    marginBottom: vs(12),
-  },
-  languageRow: {
-    flexDirection: 'row',
-    gap: s(8),
-  },
-  langPill: {
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    borderWidth: 1,
-    borderColor: '#333366',
-    borderRadius: 16,
-    paddingHorizontal: s(10),
-    paddingVertical: s(6),
-  },
-  langPillActive: {
-    borderColor: '#00FFFF',
-    backgroundColor: 'rgba(0,255,255,0.12)',
-  },
-  langText: {
-    fontFamily: FONT_SEMIBOLD,
-    fontSize: ms(12),
-    color: '#888899',
-  },
-  langTextActive: {
-    color: '#00FFFF',
-    fontFamily: FONT_SEMIBOLD,
-  },
-  difficultyRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: s(10),
-    marginTop: vs(12),
-  },
-  difficultyPill: {
-    paddingHorizontal: s(14),
-    paddingVertical: vs(8),
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#333366',
-    backgroundColor: 'rgba(255,255,255,0.05)',
-  },
-  difficultyPillActive: {
-    borderColor: '#00FFFF',
-    backgroundColor: 'rgba(0,255,255,0.15)',
-  },
-  difficultyText: {
-    fontFamily: FONT_SEMIBOLD,
-    fontSize: ms(12),
-    color: '#C3C7FF',
-    letterSpacing: 1,
-  },
-  difficultyTextActive: {
-    color: '#00FFFF',
-    fontFamily: FONT_SEMIBOLD,
-  },
-  resetButton: {
-    marginTop: vs(16),
-    paddingVertical: vs(10),
-    alignItems: 'center',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#FF00FF',
-    backgroundColor: 'rgba(255,0,255,0.12)',
-  },
-  resetButtonText: {
-    fontFamily: FONT_BOLD,
-    fontSize: ms(12),
-    color: '#FF00FF',
-    letterSpacing: 1,
-  },
-  resetHint: {
-    fontFamily: FONT_SEMIBOLD,
-    fontSize: ms(10),
-    color: '#666699',
-    marginTop: vs(8),
-    textAlign: 'center',
-    lineHeight: vs(14),
-  },
-  settingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    borderWidth: 1,
-    borderColor: '#333366',
-    borderRadius: 8,
-    padding: s(12),
-    marginBottom: vs(10),
-  },
-  settingIcon: {
-    marginRight: s(12),
-  },
-  settingContent: {
-    flex: 1,
-  },
-  settingTitle: {
-    fontFamily: FONT_BOLD,
-    fontSize: ms(12),
-    color: '#FFFFFF',
-    letterSpacing: 1,
-  },
-  settingSubtitle: {
-    fontFamily: FONT_SEMIBOLD,
-    fontSize: ms(11),
-    color: '#888899',
-    marginTop: 4,
-  },
-  switch: {
-    transform: [{ scaleX: 1.2 }, { scaleY: 1.2 }],
-  },
-  valueButton: {
-    backgroundColor: 'rgba(0,255,255,0.2)',
-    borderWidth: 1,
-    borderColor: '#00FFFF',
-    borderRadius: 6,
-    paddingHorizontal: s(10),
-    paddingVertical: s(6),
-  },
-  valueText: {
-    fontFamily: FONT_BOLD,
-    fontSize: ms(12),
-    color: '#00FFFF',
-  },
-  timerSetting: {
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    borderWidth: 1,
-    borderColor: '#333366',
-    borderRadius: 8,
-    padding: s(12),
-    marginBottom: vs(10),
-  },
-  timerTitle: {
-    fontFamily: FONT_BOLD,
-    fontSize: ms(12),
-    color: '#FFFFFF',
-    letterSpacing: 1,
-    marginBottom: vs(8),
-  },
-  timerControls: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  timerButton: {
-    width: ms(36),
-    height: ms(36),
-    backgroundColor: 'rgba(255,0,255,0.2)',
-    borderWidth: 2,
-    borderColor: '#FF00FF',
-    borderRadius: ms(18),
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  timerButtonText: {
-    fontFamily: FONT_BOLD,
-    fontSize: ms(18),
-    color: '#FF00FF',
-  },
-  timerValue: {
-    fontFamily: FONT_BOLD,
-    fontSize: ms(16),
-    color: '#FFFF00',
-    letterSpacing: 1,
-  },
-  aboutCard: {
-    backgroundColor: 'rgba(0,255,255,0.1)',
-    borderWidth: 2,
-    borderColor: '#00FFFF',
-    borderRadius: 12,
-    padding: s(16),
-    alignItems: 'center',
-  },
-  aboutTitle: {
-    fontFamily: FONT_BOLD,
-    fontSize: ms(16),
-    color: '#00FFFF',
-    letterSpacing: 2,
-    marginTop: vs(10),
-    marginBottom: vs(8),
-  },
-  aboutText: {
-    fontFamily: FONT_SEMIBOLD,
-    fontSize: ms(12),
-    color: '#FFFFFF',
-    textAlign: 'center',
-    lineHeight: vs(18),
-    marginBottom: vs(10),
-  },
-  aboutSubtext: {
-    fontFamily: FONT_REGULAR,
-    fontSize: ms(11),
-    color: '#666699',
-    letterSpacing: 1,
-  },
-});
-
-

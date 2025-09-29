@@ -2,7 +2,6 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 
 export type SessionMode = 'work' | 'short' | 'long';
-export type DifficultyLevel = 'easy' | 'normal' | 'hard';
 export type AchievementId = 'focusStarter' | 'breakChampion' | 'timeKeeper' | 'streakMaster' | 'comboBreaker';
 
 export type AchievementState = {
@@ -29,7 +28,6 @@ export type SessionStats = {
   bestStreakDays: number;
   currentScoreStreak: number;
   bestScoreStreak: number;
-  achievementDifficulty: DifficultyLevel;
   unlockedAchievements: Record<AchievementId, boolean>;
   lastWorkDate: string | null;
   lastSessionDate: string | null;
@@ -39,7 +37,7 @@ export type SessionStats = {
 
 type AchievementDefinition = {
   id: AchievementId;
-  thresholds: Record<DifficultyLevel, number>;
+  threshold: number;
   metric: (stats: SessionStats) => number;
 };
 
@@ -52,27 +50,27 @@ const SCORE_WEIGHTS: Record<SessionMode, number> = {
 const ACHIEVEMENTS: AchievementDefinition[] = [
   {
     id: 'focusStarter',
-    thresholds: { easy: 5, normal: 10, hard: 20 },
+    threshold: 10,
     metric: stats => stats.totals.work,
   },
   {
     id: 'breakChampion',
-    thresholds: { easy: 10, normal: 20, hard: 40 },
+    threshold: 20,
     metric: stats => stats.totals.short + stats.totals.long,
   },
   {
     id: 'timeKeeper',
-    thresholds: { easy: 300 * 60, normal: 600 * 60, hard: 1200 * 60 },
+    threshold: 600 * 60,
     metric: stats => stats.focusSeconds,
   },
   {
     id: 'streakMaster',
-    thresholds: { easy: 3, normal: 7, hard: 14 },
+    threshold: 7,
     metric: stats => stats.bestStreakDays,
   },
   {
     id: 'comboBreaker',
-    thresholds: { easy: 300, normal: 600, hard: 900 },
+    threshold: 600,
     metric: stats => stats.bestScoreStreak,
   },
 ];
@@ -87,7 +85,6 @@ const DEFAULT_STATS: SessionStats = {
   bestStreakDays: 0,
   currentScoreStreak: 0,
   bestScoreStreak: 0,
-  achievementDifficulty: 'normal',
   unlockedAchievements: {
     focusStarter: false,
     breakChampion: false,
@@ -101,19 +98,15 @@ const DEFAULT_STATS: SessionStats = {
   completedSessions: [],
 };
 
-const KEY = 'session_stats_v1';
+const KEY = 'session_stats_v2'; // Incremented version due to data structure change
 const MAX_SESSION_LOG = 100;
-
-type ResetOptions = { keepDifficulty?: boolean };
 
 type SessionStatsCtx = {
   stats: SessionStats;
   ready: boolean;
   recordSession: (mode: SessionMode, durationSeconds: number, completedAt?: Date) => void;
-  resetStats: (options?: ResetOptions) => void;
-  setAchievementDifficulty: (level: DifficultyLevel) => void;
+  resetStats: () => void;
   achievementStates: AchievementState[];
-  difficulty: DifficultyLevel;
 };
 
 const SessionStatsContext = createContext<SessionStatsCtx | undefined>(undefined);
@@ -143,17 +136,15 @@ function mergeStats(partial: Partial<SessionStats>): SessionStats {
     },
     completedSessions: partial.completedSessions ?? [],
   };
-  // Ensure array is not excessively large on load
   if (merged.completedSessions.length > MAX_SESSION_LOG) {
     merged.completedSessions = merged.completedSessions.slice(0, MAX_SESSION_LOG);
   }
   return merged;
 }
 
-function evaluateAchievements(stats: SessionStats, difficulty: DifficultyLevel) {
+function evaluateAchievements(stats: SessionStats) {
   return ACHIEVEMENTS.reduce<Record<AchievementId, boolean>>((acc, achievement) => {
-    const target = achievement.thresholds[difficulty];
-    acc[achievement.id] = achievement.metric(stats) >= target;
+    acc[achievement.id] = achievement.metric(stats) >= achievement.threshold;
     return acc;
   }, {
     focusStarter: false,
@@ -165,15 +156,13 @@ function evaluateAchievements(stats: SessionStats, difficulty: DifficultyLevel) 
 }
 
 function buildAchievementStates(stats: SessionStats): AchievementState[] {
-  const difficulty = stats.achievementDifficulty;
   return ACHIEVEMENTS.map(definition => {
-    const target = definition.thresholds[difficulty];
     const value = definition.metric(stats);
     return {
       id: definition.id,
       unlocked: stats.unlockedAchievements[definition.id] ?? false,
       progress: value,
-      target,
+      target: definition.threshold,
     };
   });
 }
@@ -198,7 +187,6 @@ export function SessionStatsProvider({ children }: { children: React.ReactNode }
       })
       .finally(() => setReady(true));
   }, []);
-
 
   const updateStats = useCallback((updater: (prev: SessionStats) => SessionStats) => {
     setStats(prev => {
@@ -243,12 +231,12 @@ export function SessionStatsProvider({ children }: { children: React.ReactNode }
             const delta = diffInDays(sessionDay, lastWorkDate);
             if (delta === 1) {
               currentStreakDays++;
-              streakBonus = Math.min(10, currentStreakDays) * 5; // Bonus increases with streak, capped at 50
+              streakBonus = Math.min(10, currentStreakDays) * 5;
             } else if (delta > 1) {
-              currentStreakDays = 1; // Reset streak
+              currentStreakDays = 1;
             }
           } else {
-            currentStreakDays = 1; // First work session
+            currentStreakDays = 1;
           }
           lastWorkDate = sessionDay;
           bestStreakDays = Math.max(bestStreakDays, currentStreakDays);
@@ -258,7 +246,7 @@ export function SessionStatsProvider({ children }: { children: React.ReactNode }
         let comboBonus = 0;
         if (prev.lastSessionDate && diffInDays(sessionDay, prev.lastSessionDate) === 0) {
           currentScoreStreak++;
-          comboBonus = Math.min(5, currentScoreStreak) * 2; // Bonus increases with combo, capped at 10
+          comboBonus = Math.min(5, currentScoreStreak) * 2;
         } else {
           currentScoreStreak = 1;
         }
@@ -284,7 +272,7 @@ export function SessionStatsProvider({ children }: { children: React.ReactNode }
           completedSessions: nextCompletedSessions,
         };
 
-        const evaluated = evaluateAchievements(nextStats, nextStats.achievementDifficulty);
+        const evaluated = evaluateAchievements(nextStats);
         nextStats.unlockedAchievements = {
           ...nextStats.unlockedAchievements,
           ...evaluated,
@@ -296,34 +284,13 @@ export function SessionStatsProvider({ children }: { children: React.ReactNode }
     [updateStats]
   );
 
-  const resetStats = useCallback((options?: ResetOptions) => {
-    setStats(prev => {
-      const base = options?.keepDifficulty
-        ? { ...DEFAULT_STATS, achievementDifficulty: prev.achievementDifficulty }
-        : DEFAULT_STATS;
-      const evaluated = evaluateAchievements(base, base.achievementDifficulty);
-      const next = {
-        ...base,
-        unlockedAchievements: {
-          ...base.unlockedAchievements,
-          ...evaluated,
-        },
-      };
+  const resetStats = useCallback(() => {
+    setStats(() => {
+      const next = { ...DEFAULT_STATS };
       AsyncStorage.setItem(KEY, JSON.stringify(next)).catch(() => {});
       return next;
     });
   }, []);
-
-  const setAchievementDifficulty = useCallback((level: DifficultyLevel) => {
-    updateStats(prev => {
-      const next = {
-        ...prev,
-        achievementDifficulty: level,
-      };
-      next.unlockedAchievements = evaluateAchievements(next, level);
-      return next;
-    });
-  }, [updateStats]);
 
   const achievementStates = useMemo(() => buildAchievementStates(stats), [stats]);
 
@@ -332,10 +299,8 @@ export function SessionStatsProvider({ children }: { children: React.ReactNode }
     ready,
     recordSession,
     resetStats,
-    setAchievementDifficulty,
     achievementStates,
-    difficulty: stats.achievementDifficulty,
-  }), [stats, ready, recordSession, resetStats, setAchievementDifficulty, achievementStates]);
+  }), [stats, ready, recordSession, resetStats, achievementStates]);
 
   return <SessionStatsContext.Provider value={value}>{children}</SessionStatsContext.Provider>;
 }
