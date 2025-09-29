@@ -27,74 +27,13 @@ import {
 import { s, vs, ms, clamp, msc } from '@/lib/responsive';
 import { t, resolveLang } from '@/lib/i18n';
 import { usePrefs } from '@/context/PrefsContext';
-import { useSessionStats, AchievementId, CompletedSession } from '@/context/SessionStatsContext';
+import { useSessionStats, CompletedSession } from '@/context/SessionStatsContext';
 import { useRouter } from 'expo-router';
 import { useTheme } from '@/context/ThemeContext';
 import { Palette } from '@/lib/theme';
 
 type Mode = 'work' | 'short' | 'long';
 type ScoreItem = { key: string; label: string; value: string; emphasis?: boolean; icon: React.ReactNode };
-
-const StatsSection = () => {
-    const { stats: sessionStats } = useSessionStats();
-    const { theme } = useTheme();
-    const palette = theme.colors;
-    const { prefs } = usePrefs();
-    const uiLang = resolveLang(prefs.language);
-
-    const dailyGoals = Object.values(sessionStats.dailyGoals);
-
-    const goalColors: Record<string, string> = {
-        workSessions: palette.secondary,
-        shortBreaks: palette.primary,
-        longBreaks: palette.success,
-        completedTasks: palette.accent,
-    };
-
-    const ProgressBar = ({
-      label,
-      percentage,
-      color = '#FF00FF',
-      detail,
-    }: {
-      label: string;
-      percentage: number;
-      color?: string;
-      detail?: string;
-    }) => {
-      const clamped = Math.max(0, Math.min(100, percentage));
-      return (
-        <View style={styles.progressBarContainer}>
-          <View style={styles.progressBarHeader}>
-            <Text style={styles.progressLabel}>{label}</Text>
-            <Text style={[styles.progressPercentage, { color }]}>{detail ?? `${clamped}%`}</Text>
-          </View>
-          <View style={styles.progressBarTrack}>
-            <View
-              style={[styles.progressBarFill, { width: `${clamped}%`, backgroundColor: color }]}
-            />
-          </View>
-        </View>
-      );
-    };
-
-    return (
-      <View style={{marginTop: vs(24)}}>
-        <View style={styles.section}>
-            <Text style={styles.sectionTitle}>{t('stats.dailyGoals.title', uiLang)}</Text>
-            {dailyGoals.map(goal => (
-              <ProgressBar
-                key={goal.id}
-                label={t(`stats.dailyGoals.${goal.id}`, uiLang, goal.id)}
-                percentage={(goal.progress / goal.target) * 100}
-                detail={`${goal.progress}/${goal.target}`}
-                color={goalColors[goal.id] ?? palette.warning}
-              />
-            ))}
-        </View>
-      </View>
-    );
-  }
 
 const FONT_REGULAR = 'Poppins-Regular';
 const FONT_MEDIUM = 'Poppins-Medium';
@@ -175,7 +114,7 @@ const TimerScreen = () => {
   const { width: winW, height: winH } = useWindowDimensions();
   const { prefs } = usePrefs();
   const uiLang = resolveLang(prefs.language);
-  const { stats: sessionStats, recordSession, achievementStates } = useSessionStats();
+  const { stats: sessionStats, recordSession } = useSessionStats();
   const router = useRouter();
   const { theme } = useTheme();
   const palette = theme.colors;
@@ -607,7 +546,6 @@ const TimerScreen = () => {
   const StatsSection = () => {
     const focusMinutes = Math.round(sessionStats.focusSeconds / 60);
     const breakMinutes = Math.round(sessionStats.breakSeconds / 60);
-    const completedSessions = sessionStats.completedSessions ?? [];
   
     const productivity = focusMinutes + breakMinutes > 0
       ? Math.round((focusMinutes / (focusMinutes + breakMinutes)) * 100)
@@ -619,40 +557,10 @@ const TimerScreen = () => {
     const shortShare = sessionStats.totalSessions > 0 ? Math.round((sessionStats.totals.short / sessionStats.totalSessions) * 100) : 0;
     const longShare = sessionStats.totalSessions > 0 ? Math.round((sessionStats.totals.long / sessionStats.totalSessions) * 100) : 0;
   
-    const achievements = useMemo(() =>
-      achievementStates.map(state => {
-        const name = t(`stats.achievements.${state.id}.name`, uiLang);
-        const description = t(`stats.achievements.${state.id}.description`, uiLang);
-        return { ...state, name, description };
-      }),
-    [achievementStates, uiLang]);
-  
-    const unlockedCount = achievements.filter(item => item.unlocked).length;
-  
     const formatTime = (minutes: number) => {
       const hours = Math.floor(minutes / 60);
       const mins = minutes % 60;
       return hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
-    };
-  
-    const formatDuration = (seconds: number) => {
-      const mins = Math.floor(seconds / 60).toString().padStart(2, '0');
-      const secs = (seconds % 60).toString().padStart(2, '0');
-      return `${mins}:${secs}`;
-    };
-  
-    const formatAchievementProgress = (id: AchievementId, progress: number, target: number) => {
-      switch (id) {
-        case 'timeKeeper': {
-          const currentHours = Math.floor(progress / 3600);
-          const targetHours = Math.floor(target / 3600);
-          return `${currentHours}h/${targetHours}h`;
-        }
-        case 'comboBreaker':
-          return `${Math.min(Math.round(progress), Math.round(target))}/${Math.round(target)}`;
-        default:
-          return `${Math.min(Math.round(progress), Math.round(target))}/${Math.round(target)}`;
-      }
     };
   
     const StatCard = ({
@@ -708,142 +616,15 @@ const TimerScreen = () => {
         </View>
       );
     };
-  
-    const determineDailyAchievements = (entry: { workSeconds: number; breakSeconds: number }, avgWork: number, avgBreak: number): DailyAchievementKey[] => {
-      const badges: DailyAchievementKey[] = [];
-      if (avgWork > 0) {
-        if (entry.workSeconds >= avgWork * 1.3 && entry.workSeconds >= 3600) {
-          badges.push('focusLegend');
-        } else if (entry.workSeconds >= avgWork && entry.workSeconds > 0) {
-          badges.push('focusPro');
-        }
-      } else if (entry.workSeconds > 0) {
-        badges.push('focusPro');
-      }
 
-      if (avgBreak > 0) {
-        if (entry.breakSeconds <= avgBreak * 0.7 && entry.workSeconds > 0) {
-          badges.push('breakEfficient');
-        } else if (entry.breakSeconds >= avgBreak * 1.3 && entry.breakSeconds >= 1800) {
-          badges.push('recovery');
-        }
-      }
+    const dailyGoals = Object.values(sessionStats.dailyGoals);
 
-      const ratio = entry.workSeconds > 0 && entry.breakSeconds > 0 ? entry.breakSeconds / entry.workSeconds : null;
-      if (ratio && ratio >= 0.2 && ratio <= 0.5) {
-        badges.push('balanced');
-      }
-
-      if (!badges.length) {
-        badges.push('steady');
-      }
-
-      return Array.from(new Set(badges));
+    const goalColors: Record<string, string> = {
+        workSessions: palette.secondary,
+        shortBreaks: palette.primary,
+        longBreaks: palette.success,
+        completedTasks: palette.accent,
     };
-
-    const formatHoursLabel = (seconds: number) => {
-      if (seconds <= 0) return '0m';
-      const totalMinutes = Math.round(seconds / 60);
-      const hours = Math.floor(totalMinutes / 60);
-      const minutes = totalMinutes % 60;
-      if (hours > 0) {
-        return `${hours}h ${minutes.toString().padStart(2, '0')}m`;
-      }
-      return `${minutes}m`;
-    };
-
-    const formatDayLabel = (isoDate: string) => {
-      try {
-        return new Date(`${isoDate}T00:00:00`).toLocaleDateString(uiLang);
-      } catch {
-        return isoDate;
-      }
-    };
-
-    const dailySummary = useMemo<DailySummary>(() => {
-      if (!completedSessions.length) {
-        return { entries: [], averageWork: 0, averageBreak: 0 };
-      }
-
-      const map = new Map<string, { workSeconds: number; breakSeconds: number; sessions: number }>();
-      for (const session of completedSessions) {
-        const dayKey = session.completedAt?.slice(0, 10) ?? '';
-        if (!dayKey) continue;
-        const bucket = map.get(dayKey) ?? { workSeconds: 0, breakSeconds: 0, sessions: 0 };
-        if (session.mode === 'work') {
-          bucket.workSeconds += session.durationSeconds;
-        } else {
-          bucket.breakSeconds += session.durationSeconds;
-        }
-        bucket.sessions += 1;
-        map.set(dayKey, bucket);
-      }
-
-      const entriesBase = Array.from(map.entries())
-        .map(([date, data]) => ({ date, ...data }))
-        .sort((a, b) => (a.date < b.date ? 1 : -1));
-
-      if (!entriesBase.length) {
-        return { entries: [], averageWork: 0, averageBreak: 0 };
-      }
-
-      const totalWork = entriesBase.reduce((sum, entry) => sum + entry.workSeconds, 0);
-      const totalBreak = entriesBase.reduce((sum, entry) => sum + entry.breakSeconds, 0);
-      const days = entriesBase.length || 1;
-      const avgWork = totalWork / days;
-      const avgBreak = totalBreak / days;
-
-      const entries = entriesBase.map(entry => ({
-        ...entry,
-        achievements: determineDailyAchievements(entry, avgWork, avgBreak),
-      }));
-
-      return { entries, averageWork: avgWork, averageBreak: avgBreak };
-    }, [completedSessions]);
-
-    const DailyAchievements = ({ summary }: { summary: DailySummary }) => (
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>{t('stats.dailyAchievements.title', uiLang)}</Text>
-        <Text style={styles.dailyAverageLabel}>
-          {t('stats.dailyAchievements.averageLabel', uiLang)
-            .replace('{focus}', formatHoursLabel(summary.averageWork))
-            .replace('{break}', formatHoursLabel(summary.averageBreak))}
-        </Text>
-        {summary.entries.length ? (
-          <ScrollView nestedScrollEnabled style={styles.dailyAchievementsScroll}>
-            {summary.entries.map(entry => (
-              <View key={entry.date} style={styles.dailyAchievementCard}>
-                <View style={styles.dailyAchievementHeader}>
-                  <Text style={styles.dailyAchievementDate}>{formatDayLabel(entry.date)}</Text>
-                  <Text style={styles.dailyAchievementSessions}>
-                    {t('stats.sessions', uiLang)}: {entry.sessions}
-                  </Text>
-                </View>
-                <View style={styles.dailyAchievementStats}>
-                  <Text style={styles.dailyAchievementStat}>
-                    {t('stats.focusTime', uiLang)}: {formatHoursLabel(entry.workSeconds)}
-                  </Text>
-                  <Text style={styles.dailyAchievementStat}>
-                    {t('stats.breakTime', uiLang)}: {formatHoursLabel(entry.breakSeconds)}
-                  </Text>
-                </View>
-                <View style={styles.dailyAchievementBadges}>
-                  {entry.achievements.map(badge => (
-                    <View key={badge} style={styles.dailyAchievementBadge}>
-                      <Text style={styles.dailyAchievementBadgeText}>
-                        {t(`stats.dailyAchievements.badge.${badge}`, uiLang)}
-                      </Text>
-                    </View>
-                  ))}
-                </View>
-              </View>
-            ))}
-          </ScrollView>
-        ) : (
-          <Text style={styles.sessionLogEmpty}>{t('stats.dailyAchievements.empty', uiLang)}</Text>
-        )}
-      </View>
-    );
   
     return (
       <View style={{marginTop: vs(24)}}>
@@ -924,54 +705,17 @@ const TimerScreen = () => {
               color="#FFFF00"
             />
           </View>
-  
-          <DailyAchievements summary={dailySummary} />
-  
+
           <View style={styles.section}>
-            <View style={styles.achievementHeader}>
-              <Text style={styles.sectionTitle}>{t('stats.achievements', uiLang)}</Text>
-              <Text style={styles.achievementCounter}>
-                {`${unlockedCount}/${achievements.length} ${t('stats.unlockedCountLabel', uiLang)}`}
-              </Text>
-            </View>
-            {achievements.map(achievement => (
-              <View
-                key={achievement.id}
-                style={[
-                  styles.achievementItem,
-                  {
-                    borderColor: achievement.unlocked ? '#00FF66' : '#333366',
-                    backgroundColor: achievement.unlocked ? 'rgba(0,255,102,0.1)' : 'rgba(51,51,102,0.1)',
-                  },
-                ]}
-              >
-                <Trophy
-                  size={24}
-                  color={achievement.unlocked ? '#00FF66' : '#666699'}
-                  strokeWidth={2}
-                />
-                <View style={styles.achievementText}>
-                  <Text
-                    style={[
-                      styles.achievementName,
-                      { color: achievement.unlocked ? '#00FF66' : '#666699' },
-                    ]}
-                  >
-                    {achievement.name}
-                  </Text>
-                  <Text style={styles.achievementDescription}>
-                    {achievement.description}
-                  </Text>
-                </View>
-                <View style={styles.achievementProgress}>
-                  <Text style={styles.achievementProgressText}>
-                    {formatAchievementProgress(achievement.id, achievement.progress, achievement.target)}
-                  </Text>
-                  {achievement.unlocked && (
-                    <Text style={styles.unlockedText}>{t('stats.unlocked', uiLang)}</Text>
-                  )}
-                </View>
-              </View>
+            <Text style={styles.sectionTitle}>{t('stats.dailyGoals.title', uiLang, 'Daily Goals')}</Text>
+            {dailyGoals.map(goal => (
+              <ProgressBar
+                key={goal.id}
+                label={t(`stats.dailyGoals.${goal.id}`, uiLang, goal.id)}
+                percentage={goal.target > 0 ? (goal.progress / goal.target) * 100 : 0}
+                detail={`${goal.progress}/${goal.target}`}
+                color={goalColors[goal.id] ?? palette.warning}
+              />
             ))}
           </View>
         </View>
@@ -2011,5 +1755,3 @@ const makeStyles = (palette: any) => StyleSheet.create({
     marginBottom: vs(4),
   },
 });
-
-
