@@ -40,37 +40,54 @@ const FONT_MEDIUM = 'Poppins-Medium';
 const FONT_SEMIBOLD = 'Poppins-SemiBold';
 const FONT_BOLD = 'Poppins-Bold';
 
-const PomodoroProgressBar = ({ cycle, mode, palette }: { cycle: number; mode: Mode; palette: Palette }) => {
+const PomodoroProgressBar = ({
+  currentPhaseIndex,
+  workDuration,
+  shortBreakDuration,
+  longBreakDuration,
+  palette,
+}: {
+  currentPhaseIndex: number;
+  workDuration: number;
+  shortBreakDuration: number;
+  longBreakDuration: number;
+  palette: Palette;
+}) => {
   const styles = makeStyles(palette);
+
+  const phases = useMemo(() => [
+    { type: 'work', duration: workDuration, color: palette.secondary },
+    { type: 'short', duration: shortBreakDuration, color: palette.primary },
+    { type: 'work', duration: workDuration, color: palette.secondary },
+    { type: 'short', duration: shortBreakDuration, color: palette.primary },
+    { type: 'work', duration: workDuration, color: palette.secondary },
+    { type: 'short', duration: shortBreakDuration, color: palette.primary },
+    { type: 'work', duration: workDuration, color: palette.secondary },
+    { type: 'long', duration: longBreakDuration, color: palette.success },
+  ], [workDuration, shortBreakDuration, longBreakDuration, palette]);
+
   return (
     <View style={styles.pomodoroBar}>
-      {Array.from({ length: 4 }).map((_, i) => {
-        let segmentStyle;
-        if (i < cycle) {
-          // Completed work session
-          segmentStyle = { backgroundColor: palette.success };
-        } else if (i === cycle) {
-          // Current session
-          if (mode === 'work') {
-            segmentStyle = { backgroundColor: palette.secondary }; // Active work
-          } else if (mode === 'short' || mode === 'long') {
-            segmentStyle = { backgroundColor: palette.success }; // Break after the work
-          }
-        } else {
-          // Upcoming session
-          segmentStyle = { backgroundColor: palette.border };
-        }
-
-        // The last segment leads to a long break
-        const isLongBreakSegment = i === 3;
+      {phases.map((phase, i) => {
+        const isActive = i === currentPhaseIndex;
+        const glowStyle = isActive ? {
+          shadowColor: phase.color,
+          shadowOffset: { width: 0, height: 0 },
+          shadowOpacity: 1,
+          shadowRadius: 8,
+          elevation: 5, // For Android
+        } : {};
 
         return (
           <View
             key={i}
             style={[
               styles.pomodoroSegment,
-              segmentStyle,
-              isLongBreakSegment && styles.pomodoroSegmentLong,
+              {
+                flex: phase.duration,
+                backgroundColor: phase.color,
+              },
+              glowStyle,
             ]}
           />
         );
@@ -230,6 +247,20 @@ const TimerScreen = () => {
 
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const glowAnim = useRef(new Animated.Value(0)).current;
+
+  const currentPhaseIndex = useMemo(() => {
+    if (mode === 'work') {
+      return workCycleRef.current * 2;
+    }
+    if (mode === 'short') {
+      // This logic assumes the cycle ref has already been incremented by the advancePhase function
+      return workCycleRef.current * 2 - 1;
+    }
+    if (mode === 'long') {
+      return 7;
+    }
+    return -1; // Not in a standard pomodoro phase
+  }, [mode]);
 
   useEffect(() => {
     let interval: ReturnType<typeof setInterval> | null = null;
@@ -889,7 +920,13 @@ const TimerScreen = () => {
                     ]}
                   />
                 </View>
-                <PomodoroProgressBar cycle={workCycleRef.current} mode={mode} palette={palette} />
+                <PomodoroProgressBar
+                  currentPhaseIndex={currentPhaseIndex}
+                  workDuration={prefs.workDuration}
+                  shortBreakDuration={prefs.shortBreakDuration}
+                  longBreakDuration={prefs.longBreakDuration}
+                  palette={palette}
+                />
               </View>
 
               {renderScoreBoard('landscape')}
@@ -928,7 +965,13 @@ const TimerScreen = () => {
                     ]} 
                   />
                 </View>
-                <PomodoroProgressBar cycle={workCycleRef.current} mode={mode} palette={palette} />
+                <PomodoroProgressBar
+                  currentPhaseIndex={currentPhaseIndex}
+                  workDuration={prefs.workDuration}
+                  shortBreakDuration={prefs.shortBreakDuration}
+                  longBreakDuration={prefs.longBreakDuration}
+                  palette={palette}
+                />
               </View>
 
               <View style={styles.controlButtons}>
