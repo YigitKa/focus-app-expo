@@ -35,21 +35,66 @@ import { Palette } from '@/lib/theme';
 type Mode = 'work' | 'short' | 'long';
 type ScoreItem = { key: string; label: string; value: string; emphasis?: boolean; icon: React.ReactNode };
 
-type DailyAchievementKey = 'focusLegend' | 'focusPro' | 'breakEfficient' | 'balanced' | 'recovery' | 'steady';
+const StatsSection = () => {
+    const { stats: sessionStats } = useSessionStats();
+    const { theme } = useTheme();
+    const palette = theme.colors;
+    const { prefs } = usePrefs();
+    const uiLang = resolveLang(prefs.language);
 
-type DailySummaryEntry = {
-  date: string;
-  workSeconds: number;
-  breakSeconds: number;
-  sessions: number;
-  achievements: DailyAchievementKey[];
-};
+    const dailyGoals = Object.values(sessionStats.dailyGoals);
 
-type DailySummary = {
-  entries: DailySummaryEntry[];
-  averageWork: number;
-  averageBreak: number;
-};
+    const goalColors: Record<string, string> = {
+        workSessions: palette.secondary,
+        shortBreaks: palette.primary,
+        longBreaks: palette.success,
+        completedTasks: palette.accent,
+    };
+
+    const ProgressBar = ({
+      label,
+      percentage,
+      color = '#FF00FF',
+      detail,
+    }: {
+      label: string;
+      percentage: number;
+      color?: string;
+      detail?: string;
+    }) => {
+      const clamped = Math.max(0, Math.min(100, percentage));
+      return (
+        <View style={styles.progressBarContainer}>
+          <View style={styles.progressBarHeader}>
+            <Text style={styles.progressLabel}>{label}</Text>
+            <Text style={[styles.progressPercentage, { color }]}>{detail ?? `${clamped}%`}</Text>
+          </View>
+          <View style={styles.progressBarTrack}>
+            <View
+              style={[styles.progressBarFill, { width: `${clamped}%`, backgroundColor: color }]}
+            />
+          </View>
+        </View>
+      );
+    };
+
+    return (
+      <View style={{marginTop: vs(24)}}>
+        <View style={styles.section}>
+            <Text style={styles.sectionTitle}>{t('stats.dailyGoals.title', uiLang)}</Text>
+            {dailyGoals.map(goal => (
+              <ProgressBar
+                key={goal.id}
+                label={t(`stats.dailyGoals.${goal.id}`, uiLang, goal.id)}
+                percentage={(goal.progress / goal.target) * 100}
+                detail={`${goal.progress}/${goal.target}`}
+                color={goalColors[goal.id] ?? palette.warning}
+              />
+            ))}
+        </View>
+      </View>
+    );
+  }
 
 const FONT_REGULAR = 'Poppins-Regular';
 const FONT_MEDIUM = 'Poppins-Medium';
@@ -1966,3 +2011,5 @@ const makeStyles = (palette: any) => StyleSheet.create({
     marginBottom: vs(4),
   },
 });
+
+

@@ -2,14 +2,15 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 
 export type SessionMode = 'work' | 'short' | 'long';
-export type AchievementId = 'focusStarter' | 'breakChampion' | 'timeKeeper' | 'streakMaster' | 'comboBreaker';
+export type DailyGoalId = 'workSessions' | 'shortBreaks' | 'longBreaks' | 'completedTasks';
 
-export type AchievementState = {
-  id: AchievementId;
-  unlocked: boolean;
+export type DailyGoal = {
+  id: DailyGoalId;
   progress: number;
   target: number;
 };
+
+export type DailyGoals = Record<DailyGoalId, DailyGoal>;
 
 export type CompletedSession = {
   id: string;
@@ -28,17 +29,11 @@ export type SessionStats = {
   bestStreakDays: number;
   currentScoreStreak: number;
   bestScoreStreak: number;
-  unlockedAchievements: Record<AchievementId, boolean>;
+  dailyGoals: DailyGoals;
   lastWorkDate: string | null;
   lastSessionDate: string | null;
   lastUpdated: string | null;
   completedSessions: CompletedSession[];
-};
-
-type AchievementDefinition = {
-  id: AchievementId;
-  threshold: number;
-  metric: (stats: SessionStats) => number;
 };
 
 const SCORE_WEIGHTS: Record<SessionMode, number> = {
@@ -46,34 +41,6 @@ const SCORE_WEIGHTS: Record<SessionMode, number> = {
   short: 2,
   long: 5,
 };
-
-const ACHIEVEMENTS: AchievementDefinition[] = [
-  {
-    id: 'focusStarter',
-    threshold: 10,
-    metric: stats => stats.totals.work,
-  },
-  {
-    id: 'breakChampion',
-    threshold: 20,
-    metric: stats => stats.totals.short + stats.totals.long,
-  },
-  {
-    id: 'timeKeeper',
-    threshold: 600 * 60,
-    metric: stats => stats.focusSeconds,
-  },
-  {
-    id: 'streakMaster',
-    threshold: 7,
-    metric: stats => stats.bestStreakDays,
-  },
-  {
-    id: 'comboBreaker',
-    threshold: 600,
-    metric: stats => stats.bestScoreStreak,
-  },
-];
 
 const DEFAULT_STATS: SessionStats = {
   totals: { work: 0, short: 0, long: 0 },
@@ -85,12 +52,11 @@ const DEFAULT_STATS: SessionStats = {
   bestStreakDays: 0,
   currentScoreStreak: 0,
   bestScoreStreak: 0,
-  unlockedAchievements: {
-    focusStarter: false,
-    breakChampion: false,
-    timeKeeper: false,
-    streakMaster: false,
-    comboBreaker: false,
+  dailyGoals: {
+    workSessions: { id: 'workSessions', progress: 0, target: 8 },
+    shortBreaks: { id: 'shortBreaks', progress: 0, target: 7 },
+    longBreaks: { id: 'longBreaks', progress: 0, target: 1 },
+    completedTasks: { id: 'completedTasks', progress: 0, target: 5 },
   },
   lastWorkDate: null,
   lastSessionDate: null,
@@ -102,22 +68,26 @@ function cloneDefaultStats(): SessionStats {
   return {
     ...DEFAULT_STATS,
     totals: { ...DEFAULT_STATS.totals },
-    unlockedAchievements: { ...DEFAULT_STATS.unlockedAchievements },
+    dailyGoals: {
+      workSessions: { ...DEFAULT_STATS.dailyGoals.workSessions },
+      shortBreaks: { ...DEFAULT_STATS.dailyGoals.shortBreaks },
+      longBreaks: { ...DEFAULT_STATS.dailyGoals.longBreaks },
+      completedTasks: { ...DEFAULT_STATS.dailyGoals.completedTasks },
+    },
     completedSessions: [...DEFAULT_STATS.completedSessions],
   };
 }
 
-const KEY = 'session_stats_v2'; // Incremented version due to data structure change
+const KEY = 'session_stats_v3'; // Incremented version due to data structure change
 const MAX_SESSION_LOG = 100;
 
 type SessionStatsCtx = {
   stats: SessionStats;
   ready: boolean;
   recordSession: (mode: SessionMode, durationSeconds: number, completedAt?: Date) => void;
+  incrementCompletedTasks: (count?: number) => void;
   resetStats: () => void;
   resetWorkday: () => void;
-  resetAchievements: () => void;
-  achievementStates: AchievementState[];
 };
 
 const SessionStatsContext = createContext<SessionStatsCtx | undefined>(undefined);
@@ -141,9 +111,9 @@ function mergeStats(partial: Partial<SessionStats>): SessionStats {
       ...DEFAULT_STATS.totals,
       ...partial.totals,
     },
-    unlockedAchievements: {
-      ...DEFAULT_STATS.unlockedAchievements,
-      ...partial.unlockedAchievements,
+    dailyGoals: {
+      ...DEFAULT_STATS.dailyGoals,
+      ...partial.dailyGoals,
     },
     completedSessions: partial.completedSessions ?? [],
   };
@@ -151,31 +121,6 @@ function mergeStats(partial: Partial<SessionStats>): SessionStats {
     merged.completedSessions = merged.completedSessions.slice(0, MAX_SESSION_LOG);
   }
   return merged;
-}
-
-function evaluateAchievements(stats: SessionStats) {
-  return ACHIEVEMENTS.reduce<Record<AchievementId, boolean>>((acc, achievement) => {
-    acc[achievement.id] = achievement.metric(stats) >= achievement.threshold;
-    return acc;
-  }, {
-    focusStarter: false,
-    breakChampion: false,
-    timeKeeper: false,
-    streakMaster: false,
-    comboBreaker: false,
-  });
-}
-
-function buildAchievementStates(stats: SessionStats): AchievementState[] {
-  return ACHIEVEMENTS.map(definition => {
-    const value = definition.metric(stats);
-    return {
-      id: definition.id,
-      unlocked: stats.unlockedAchievements[definition.id] ?? false,
-      progress: value,
-      target: definition.threshold,
-    };
-  });
 }
 
 export function SessionStatsProvider({ children }: { children: React.ReactNode }) {
@@ -211,6 +156,27 @@ export function SessionStatsProvider({ children }: { children: React.ReactNode }
     (mode: SessionMode, durationSeconds: number, completedAt: Date = new Date()) => {
       updateStats(prev => {
         const completedAtISO = completedAt.toISOString();
+        const sessionDay = toDayKey(completedAt);
+
+        let dailyGoals = { ...prev.dailyGoals };
+        // Reset daily goals if it's a new day
+        if (prev.lastUpdated && toDayKey(new Date(prev.lastUpdated)) !== sessionDay) {
+          dailyGoals = {
+            workSessions: { ...dailyGoals.workSessions, progress: 0 },
+            shortBreaks: { ...dailyGoals.shortBreaks, progress: 0 },
+            longBreaks: { ...dailyGoals.longBreaks, progress: 0 },
+            completedTasks: { ...dailyGoals.completedTasks, progress: 0 },
+          };
+        }
+
+        // Update daily goal progress based on session mode
+        if (mode === 'work') {
+          dailyGoals.workSessions.progress += 1;
+        } else if (mode === 'short') {
+          dailyGoals.shortBreaks.progress += 1;
+        } else if (mode === 'long') {
+          dailyGoals.longBreaks.progress += 1;
+        }
 
         const newSession: CompletedSession = {
           id: completedAtISO,
@@ -229,8 +195,6 @@ export function SessionStatsProvider({ children }: { children: React.ReactNode }
         const focusSeconds = mode === 'work' ? prev.focusSeconds + durationSeconds : prev.focusSeconds;
         const breakSeconds = mode !== 'work' ? prev.breakSeconds + durationSeconds : prev.breakSeconds;
         const totalSessions = prev.totalSessions + 1;
-
-        const sessionDay = toDayKey(completedAt);
 
         let currentStreakDays = prev.currentStreakDays;
         let bestStreakDays = prev.bestStreakDays;
@@ -277,19 +241,46 @@ export function SessionStatsProvider({ children }: { children: React.ReactNode }
           bestStreakDays,
           currentScoreStreak,
           bestScoreStreak,
+          dailyGoals,
           lastWorkDate,
           lastSessionDate: sessionDay,
           lastUpdated: completedAtISO,
           completedSessions: nextCompletedSessions,
         };
 
-        const evaluated = evaluateAchievements(nextStats);
-        nextStats.unlockedAchievements = {
-          ...nextStats.unlockedAchievements,
-          ...evaluated,
-        };
-
         return nextStats;
+      });
+    },
+    [updateStats]
+  );
+
+  const incrementCompletedTasks = useCallback(
+    (count = 1) => {
+      updateStats(prev => {
+        const today = toDayKey(new Date());
+        let dailyGoals = { ...prev.dailyGoals };
+
+        // Reset progress if last update was on a different day
+        if (prev.lastUpdated && toDayKey(new Date(prev.lastUpdated)) !== today) {
+          dailyGoals = {
+            workSessions: { ...dailyGoals.workSessions, progress: 0 },
+            shortBreaks: { ...dailyGoals.shortBreaks, progress: 0 },
+            longBreaks: { ...dailyGoals.longBreaks, progress: 0 },
+            completedTasks: { ...dailyGoals.completedTasks, progress: 0 },
+          };
+        }
+
+        return {
+          ...prev,
+          dailyGoals: {
+            ...dailyGoals,
+            completedTasks: {
+              ...dailyGoals.completedTasks,
+              progress: dailyGoals.completedTasks.progress + count,
+            },
+          },
+          lastUpdated: new Date().toISOString(),
+        };
       });
     },
     [updateStats]
@@ -311,27 +302,14 @@ export function SessionStatsProvider({ children }: { children: React.ReactNode }
     }));
   }, [updateStats]);
 
-  const resetAchievements = useCallback(() => {
-    updateStats(prev => ({
-      ...prev,
-      unlockedAchievements: { ...DEFAULT_STATS.unlockedAchievements },
-      totalScore: 0,
-      currentScoreStreak: 0,
-      bestScoreStreak: 0,
-    }));
-  }, [updateStats]);
-
-  const achievementStates = useMemo(() => buildAchievementStates(stats), [stats]);
-
   const value = useMemo<SessionStatsCtx>(() => ({
     stats,
     ready,
     recordSession,
+    incrementCompletedTasks,
     resetStats,
     resetWorkday,
-    resetAchievements,
-    achievementStates,
-  }), [stats, ready, recordSession, resetStats, resetWorkday, resetAchievements, achievementStates]);
+  }), [stats, ready, recordSession, incrementCompletedTasks, resetStats, resetWorkday]);
 
   return <SessionStatsContext.Provider value={value}>{children}</SessionStatsContext.Provider>;
 }
