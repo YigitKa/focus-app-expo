@@ -35,6 +35,22 @@ import { Palette } from '@/lib/theme';
 type Mode = 'work' | 'short' | 'long';
 type ScoreItem = { key: string; label: string; value: string; emphasis?: boolean; icon: React.ReactNode };
 
+type DailyAchievementKey = 'focusLegend' | 'focusPro' | 'breakEfficient' | 'balanced' | 'recovery' | 'steady';
+
+type DailySummaryEntry = {
+  date: string;
+  workSeconds: number;
+  breakSeconds: number;
+  sessions: number;
+  achievements: DailyAchievementKey[];
+};
+
+type DailySummary = {
+  entries: DailySummaryEntry[];
+  averageWork: number;
+  averageBreak: number;
+};
+
 const FONT_REGULAR = 'Poppins-Regular';
 const FONT_MEDIUM = 'Poppins-Medium';
 const FONT_SEMIBOLD = 'Poppins-SemiBold';
@@ -224,6 +240,8 @@ const TimerScreen = () => {
     long: longSec,
   };
 
+  const autoProgressEnabled = prefs.autoProgress ?? true;
+
   const [timeLeft, setTimeLeft] = useState(workSec);
   const [isActive, setIsActive] = useState(false);
   const [mode, setMode] = useState<Mode>('work');
@@ -343,7 +361,7 @@ const TimerScreen = () => {
   };
 
   const skipPhase = () => {
-    advancePhase(mode, { skip: true });
+    advancePhase(mode, { skip: true, forceAdvance: true });
   };
 
   const handlePresetPress = (nextMode: Mode) => {
@@ -356,11 +374,18 @@ const TimerScreen = () => {
   };
 
   const advancePhase = useCallback(
-    (completed: Mode, opts?: { skip?: boolean }) => {
+    (completed: Mode, opts?: { skip?: boolean; forceAdvance?: boolean }) => {
       const skip = opts?.skip ?? false;
+      const shouldAdvance = opts?.forceAdvance ?? autoProgressEnabled;
 
       if (!skip) {
         recordSession(completed, presetTimes[completed]);
+      }
+
+      if (!shouldAdvance) {
+        setTimeLeft(presetTimes[completed]);
+        setIsActive(true);
+        return;
       }
 
       let nextMode: Mode = 'work';
@@ -384,7 +409,7 @@ const TimerScreen = () => {
       setIsActive(true);
       setMode(nextMode);
     },
-    [workSec, shortSec, longSec, recordSession, presetTimes]
+    [autoProgressEnabled, recordSession, presetTimes]
   );
 
   useEffect(() => {
@@ -639,22 +664,139 @@ const TimerScreen = () => {
       );
     };
   
-    const SessionLog = ({ sessions }: { sessions: CompletedSession[] }) => (
+    const determineDailyAchievements = (entry: { workSeconds: number; breakSeconds: number }, avgWork: number, avgBreak: number): DailyAchievementKey[] => {
+      const badges: DailyAchievementKey[] = [];
+      if (avgWork > 0) {
+        if (entry.workSeconds >= avgWork * 1.3 && entry.workSeconds >= 3600) {
+          badges.push('focusLegend');
+        } else if (entry.workSeconds >= avgWork && entry.workSeconds > 0) {
+          badges.push('focusPro');
+        }
+      } else if (entry.workSeconds > 0) {
+        badges.push('focusPro');
+      }
+
+      if (avgBreak > 0) {
+        if (entry.breakSeconds <= avgBreak * 0.7 && entry.workSeconds > 0) {
+          badges.push('breakEfficient');
+        } else if (entry.breakSeconds >= avgBreak * 1.3 && entry.breakSeconds >= 1800) {
+          badges.push('recovery');
+        }
+      }
+
+      const ratio = entry.workSeconds > 0 && entry.breakSeconds > 0 ? entry.breakSeconds / entry.workSeconds : null;
+      if (ratio && ratio >= 0.2 && ratio <= 0.5) {
+        badges.push('balanced');
+      }
+
+      if (!badges.length) {
+        badges.push('steady');
+      }
+
+      return Array.from(new Set(badges));
+    };
+
+    const formatHoursLabel = (seconds: number) => {
+      if (seconds <= 0) return '0m';
+      const totalMinutes = Math.round(seconds / 60);
+      const hours = Math.floor(totalMinutes / 60);
+      const minutes = totalMinutes % 60;
+      if (hours > 0) {
+        return `${hours}h ${minutes.toString().padStart(2, '0')}m`;
+      }
+      return `${minutes}m`;
+    };
+
+    const formatDayLabel = (isoDate: string) => {
+      try {
+        return new Date(`${isoDate}T00:00:00`).toLocaleDateString(uiLang);
+      } catch {
+        return isoDate;
+      }
+    };
+
+    const dailySummary = useMemo<DailySummary>(() => {
+      if (!completedSessions.length) {
+        return { entries: [], averageWork: 0, averageBreak: 0 };
+      }
+
+      const map = new Map<string, { workSeconds: number; breakSeconds: number; sessions: number }>();
+      for (const session of completedSessions) {
+        const dayKey = session.completedAt?.slice(0, 10) ?? '';
+        if (!dayKey) continue;
+        const bucket = map.get(dayKey) ?? { workSeconds: 0, breakSeconds: 0, sessions: 0 };
+        if (session.mode === 'work') {
+          bucket.workSeconds += session.durationSeconds;
+        } else {
+          bucket.breakSeconds += session.durationSeconds;
+        }
+        bucket.sessions += 1;
+        map.set(dayKey, bucket);
+      }
+
+      const entriesBase = Array.from(map.entries())
+        .map(([date, data]) => ({ date, ...data }))
+        .sort((a, b) => (a.date < b.date ? 1 : -1));
+
+      if (!entriesBase.length) {
+        return { entries: [], averageWork: 0, averageBreak: 0 };
+      }
+
+      const totalWork = entriesBase.reduce((sum, entry) => sum + entry.workSeconds, 0);
+      const totalBreak = entriesBase.reduce((sum, entry) => sum + entry.breakSeconds, 0);
+      const days = entriesBase.length || 1;
+      const avgWork = totalWork / days;
+      const avgBreak = totalBreak / days;
+
+      const entries = entriesBase.map(entry => ({
+        ...entry,
+        achievements: determineDailyAchievements(entry, avgWork, avgBreak),
+      }));
+
+      return { entries, averageWork: avgWork, averageBreak: avgBreak };
+    }, [completedSessions]);
+
+    const DailyAchievements = ({ summary }: { summary: DailySummary }) => (
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>{t('stats.sessionLog.title', uiLang)}</Text>
-        <View style={styles.sessionLogContainer}>
-          <ScrollView nestedScrollEnabled style={styles.sessionLogConsole}>
-            {sessions.length > 0 ? (
-              sessions.map(session => (
-                <Text key={session.id} style={styles.sessionLogEntry}>
-                  {`> ${t(`mode.${session.mode}`, uiLang).toUpperCase()} - ${formatDuration(session.durationSeconds)} | ${new Date(session.completedAt).toLocaleString(uiLang)}`}
-                </Text>
-              ))
-            ) : (
-              <Text style={styles.sessionLogEmpty}>{t('stats.sessionLog.empty', uiLang)}</Text>
-            )}
+        <Text style={styles.sectionTitle}>{t('stats.dailyAchievements.title', uiLang)}</Text>
+        <Text style={styles.dailyAverageLabel}>
+          {t('stats.dailyAchievements.averageLabel', uiLang)
+            .replace('{focus}', formatHoursLabel(summary.averageWork))
+            .replace('{break}', formatHoursLabel(summary.averageBreak))}
+        </Text>
+        {summary.entries.length ? (
+          <ScrollView nestedScrollEnabled style={styles.dailyAchievementsScroll}>
+            {summary.entries.map(entry => (
+              <View key={entry.date} style={styles.dailyAchievementCard}>
+                <View style={styles.dailyAchievementHeader}>
+                  <Text style={styles.dailyAchievementDate}>{formatDayLabel(entry.date)}</Text>
+                  <Text style={styles.dailyAchievementSessions}>
+                    {t('stats.sessions', uiLang)}: {entry.sessions}
+                  </Text>
+                </View>
+                <View style={styles.dailyAchievementStats}>
+                  <Text style={styles.dailyAchievementStat}>
+                    {t('stats.focusTime', uiLang)}: {formatHoursLabel(entry.workSeconds)}
+                  </Text>
+                  <Text style={styles.dailyAchievementStat}>
+                    {t('stats.breakTime', uiLang)}: {formatHoursLabel(entry.breakSeconds)}
+                  </Text>
+                </View>
+                <View style={styles.dailyAchievementBadges}>
+                  {entry.achievements.map(badge => (
+                    <View key={badge} style={styles.dailyAchievementBadge}>
+                      <Text style={styles.dailyAchievementBadgeText}>
+                        {t(`stats.dailyAchievements.badge.${badge}`, uiLang)}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
+            ))}
           </ScrollView>
-        </View>
+        ) : (
+          <Text style={styles.sessionLogEmpty}>{t('stats.dailyAchievements.empty', uiLang)}</Text>
+        )}
       </View>
     );
   
@@ -738,7 +880,7 @@ const TimerScreen = () => {
             />
           </View>
   
-          <SessionLog sessions={completedSessions} />
+          <DailyAchievements summary={dailySummary} />
   
           <View style={styles.section}>
             <View style={styles.achievementHeader}>
@@ -1652,6 +1794,70 @@ const makeStyles = (palette: any) => StyleSheet.create({
     fontSize: ms(10),
     color: '#00FF66',
     letterSpacing: 1,
+  },
+  dailyAverageLabel: {
+    fontFamily: FONT_SEMIBOLD,
+    fontSize: ms(11),
+    color: '#C3C7FF',
+    marginTop: vs(8),
+  },
+  dailyAchievementsScroll: {
+    maxHeight: vs(220),
+    marginTop: vs(12),
+  },
+  dailyAchievementCard: {
+    borderWidth: 1,
+    borderColor: '#2E2E5A',
+    borderRadius: 10,
+    padding: s(12),
+    marginBottom: vs(12),
+    backgroundColor: 'rgba(10,10,40,0.6)',
+    gap: vs(8),
+  },
+  dailyAchievementHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  dailyAchievementDate: {
+    fontFamily: FONT_BOLD,
+    fontSize: ms(12),
+    color: '#FFFFFF',
+    letterSpacing: 1,
+  },
+  dailyAchievementSessions: {
+    fontFamily: FONT_SEMIBOLD,
+    fontSize: ms(11),
+    color: '#00FFAA',
+  },
+  dailyAchievementStats: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  dailyAchievementStat: {
+    fontFamily: FONT_SEMIBOLD,
+    fontSize: ms(11),
+    color: '#C3C7FF',
+  },
+  dailyAchievementBadges: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: s(6),
+  },
+  dailyAchievementBadge: {
+    borderRadius: 12,
+    paddingHorizontal: s(10),
+    paddingVertical: s(4),
+    backgroundColor: 'rgba(0,255,170,0.1)',
+    borderWidth: 1,
+    borderColor: '#00FFAA',
+  },
+  dailyAchievementBadgeText: {
+    fontFamily: FONT_SEMIBOLD,
+    fontSize: ms(10),
+    color: '#00FFAA',
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
   },
   sessionLogContainer: {
     height: vs(200),

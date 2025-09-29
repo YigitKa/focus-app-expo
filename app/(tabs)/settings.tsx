@@ -222,7 +222,7 @@ export default function SettingsScreen() {
     soundEnabled: true,
     vibrateEnabled: true,
     notificationsEnabled: true,
-    autoBreaks: true,
+    autoProgress: true,
     workDuration: 25,
     shortBreakDuration: 5,
     longBreakDuration: 15,
@@ -234,8 +234,9 @@ export default function SettingsScreen() {
       workDuration: prefs.workDuration,
       shortBreakDuration: prefs.shortBreakDuration,
       longBreakDuration: prefs.longBreakDuration,
+      autoProgress: prefs.autoProgress ?? true,
     }));
-  }, [prefs.workDuration, prefs.shortBreakDuration, prefs.longBreakDuration]);
+  }, [prefs.workDuration, prefs.shortBreakDuration, prefs.longBreakDuration, prefs.autoProgress]);
 
   const updateSetting = (key: string, value: any) => {
     setSettings(prev => ({ ...prev, [key]: value }));
@@ -451,10 +452,14 @@ ${message}`) : true;
           
           <SettingRow
             icon={<Clock size={24} color={palette.success} strokeWidth={2} />}
-            title={t('settings.autoBreaks', uiLang)}
-            subtitle="Automatically start break timers"
-            value={settings.autoBreaks}
-            onToggle={() => updateSetting('autoBreaks', !settings.autoBreaks)}
+            title={t('settings.autoProgress', uiLang)}
+            subtitle={t('settings.autoProgressSubtitle', uiLang)}
+            value={settings.autoProgress}
+            onToggle={() => {
+              const next = !settings.autoProgress;
+              updateSetting('autoProgress', next);
+              updatePrefs({ autoProgress: next });
+            }}
           />
 
           <TimerSetting

@@ -8,6 +8,7 @@ export type Prefs = {
   workDuration: number; // minutes
   shortBreakDuration: number; // minutes
   longBreakDuration: number; // minutes
+  autoProgress: boolean;
 };
 
 const DEFAULT_PREFS: Prefs = {
@@ -15,6 +16,7 @@ const DEFAULT_PREFS: Prefs = {
   workDuration: 25,
   shortBreakDuration: 5,
   longBreakDuration: 15,
+  autoProgress: true,
 };
 
 const KEY = 'app_prefs_v1';
@@ -67,4 +69,3 @@ export function usePrefs() {
   if (!ctx) throw new Error('usePrefs must be used within PrefsProvider');
   return ctx;
 }
-
