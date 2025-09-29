@@ -22,6 +22,7 @@ import {
   Clock as ClockIcon,
   Target,
   Timer as TimerIcon,
+  Smile,
 } from 'lucide-react-native';
 import { s, vs, ms, clamp, msc } from '@/lib/responsive';
 import { t, resolveLang } from '@/lib/i18n';
@@ -29,6 +30,7 @@ import { usePrefs } from '@/context/PrefsContext';
 import { useSessionStats, AchievementId, CompletedSession } from '@/context/SessionStatsContext';
 import { useRouter } from 'expo-router';
 import { useTheme } from '@/context/ThemeContext';
+import { Palette } from '@/lib/theme';
 
 type Mode = 'work' | 'short' | 'long' | 'free';
 type ScoreItem = { key: string; label: string; value: string; emphasis?: boolean; icon: React.ReactNode };
@@ -37,6 +39,45 @@ const FONT_REGULAR = 'Poppins-Regular';
 const FONT_MEDIUM = 'Poppins-Medium';
 const FONT_SEMIBOLD = 'Poppins-SemiBold';
 const FONT_BOLD = 'Poppins-Bold';
+
+const PomodoroProgressBar = ({ cycle, mode, palette }: { cycle: number; mode: Mode; palette: Palette }) => {
+  const styles = makeStyles(palette);
+  return (
+    <View style={styles.pomodoroBar}>
+      {Array.from({ length: 4 }).map((_, i) => {
+        let segmentStyle;
+        if (i < cycle) {
+          // Completed work session
+          segmentStyle = { backgroundColor: palette.success };
+        } else if (i === cycle) {
+          // Current session
+          if (mode === 'work') {
+            segmentStyle = { backgroundColor: palette.secondary }; // Active work
+          } else if (mode === 'short' || mode === 'long') {
+            segmentStyle = { backgroundColor: palette.success }; // Break after the work
+          }
+        } else {
+          // Upcoming session
+          segmentStyle = { backgroundColor: palette.border };
+        }
+
+        // The last segment leads to a long break
+        const isLongBreakSegment = i === 3;
+
+        return (
+          <View
+            key={i}
+            style={[
+              styles.pomodoroSegment,
+              segmentStyle,
+              isLongBreakSegment && styles.pomodoroSegmentLong,
+            ]}
+          />
+        );
+      })}
+    </View>
+  );
+};
 
 const TimerScreen = () => {
   const { width: winW, height: winH } = useWindowDimensions();
@@ -50,6 +91,8 @@ const TimerScreen = () => {
   const totals = sessionStats.totals;
   const totalScore = sessionStats.totalScore;
   const focusSeconds = sessionStats.focusSeconds;
+  const breakSeconds = sessionStats.breakSeconds;
+
   const formatCompactTime = (seconds: number) => {
     const hours = Math.floor(seconds / 3600);
     const mins = Math.floor((seconds % 3600) / 60);
@@ -79,16 +122,22 @@ const TimerScreen = () => {
         icon: <Moon size={iconSize} color={palette.success} strokeWidth={2} />,
       },
       {
-        key: 'sessions',
-        label: t('stats.sessions', uiLang),
-        value: sessionStats.totalSessions.toString(),
-        icon: <ClockIcon size={iconSize} color={palette.primary} strokeWidth={2} />,
-      },
-      {
         key: 'focus',
         label: t('stats.focusTime', uiLang),
         value: formatCompactTime(focusSeconds),
         icon: <TimerIcon size={iconSize} color={palette.secondary} strokeWidth={2} />,
+      },
+      {
+        key: 'break',
+        label: t('stats.breakTime', uiLang),
+        value: formatCompactTime(breakSeconds),
+        icon: <Smile size={iconSize} color={palette.primary} strokeWidth={2} />,
+      },
+      {
+        key: 'sessions',
+        label: t('stats.sessions', uiLang),
+        value: sessionStats.totalSessions.toString(),
+        icon: <ClockIcon size={iconSize} color={palette.success} strokeWidth={2} />,
       },
       {
         key: 'streak',
@@ -116,6 +165,7 @@ const TimerScreen = () => {
     totals.long,
     sessionStats.totalSessions,
     focusSeconds,
+    breakSeconds,
     sessionStats.currentStreakDays,
     sessionStats.bestStreakDays,
     sessionStats.currentScoreStreak,
@@ -380,8 +430,7 @@ const TimerScreen = () => {
     document.title = `${formattedRemaining} - ${statusLabel} - ${baseTitle}`;
   }, [isWeb, timeLeft, isBreak, uiLang]);
 
-  const portraitColumns = 4;
-  const portraitBasis = '23%';
+  const portraitBasis = '32%';
 
   const renderScoreBoard = (variant: 'portrait' | 'landscape') => (
     <View
@@ -404,8 +453,9 @@ const TimerScreen = () => {
             item.key === 'work' ? palette.secondary :
             item.key === 'short' ? palette.primary :
             item.key === 'long' ? palette.success :
-            item.key === 'sessions' ? palette.primary :
+            item.key === 'sessions' ? palette.success :
             item.key === 'focus' ? palette.secondary :
+            item.key === 'break' ? palette.primary :
             item.key === 'streak' ? palette.accent :
             item.key === 'combo' ? palette.warning :
             palette.warning;
@@ -424,10 +474,10 @@ const TimerScreen = () => {
               <View style={[styles.scoreIcon, { backgroundColor: tileBackground }]}>{item.icon}</View>
               <Text
                 style={styles.scoreLabel}
-                numberOfLines={3}
+                numberOfLines={2}
                 ellipsizeMode="clip"
                 adjustsFontSizeToFit
-                minimumFontScale={0.4}
+                minimumFontScale={0.5}
               >
                 {item.label}
               </Text>
@@ -839,6 +889,7 @@ const TimerScreen = () => {
                     ]}
                   />
                 </View>
+                <PomodoroProgressBar cycle={workCycleRef.current} mode={mode} palette={palette} />
               </View>
 
               {renderScoreBoard('landscape')}
@@ -877,6 +928,7 @@ const TimerScreen = () => {
                     ]} 
                   />
                 </View>
+                <PomodoroProgressBar cycle={workCycleRef.current} mode={mode} palette={palette} />
               </View>
 
               <View style={styles.controlButtons}>
@@ -1004,6 +1056,7 @@ const TimerScreen = () => {
                     ]}
                   />
                 </View>
+                <PomodoroProgressBar cycle={workCycleRef.current} mode={mode} palette={palette} />
               </View>
 
               {renderScoreBoard('landscape')}
@@ -1042,6 +1095,7 @@ const TimerScreen = () => {
                     ]} 
                   />
                 </View>
+                <PomodoroProgressBar cycle={workCycleRef.current} mode={mode} palette={palette} />
               </View>
 
               <View style={styles.controlButtons}>
@@ -1225,6 +1279,7 @@ const makeStyles = (palette: any) => StyleSheet.create({
     width: '100%',
     marginTop: vs(16),
     alignItems: 'center',
+    gap: vs(12),
   },
   progressBar: {
     width: '80%',
@@ -1232,6 +1287,22 @@ const makeStyles = (palette: any) => StyleSheet.create({
     backgroundColor: palette.border,
     borderRadius: 4,
     overflow: 'hidden',
+  },
+  pomodoroBar: {
+    flexDirection: 'row',
+    width: '80%',
+    height: s(10),
+    borderRadius: 5,
+    overflow: 'hidden',
+    gap: s(4),
+  },
+  pomodoroSegment: {
+    flex: 1,
+    height: '100%',
+  },
+  pomodoroSegmentLong: {
+    borderTopRightRadius: 5,
+    borderBottomRightRadius: 5,
   },
   progressFill: {
     height: '100%',
@@ -1309,6 +1380,7 @@ const makeStyles = (palette: any) => StyleSheet.create({
   playerProgressSection: {
     width: '100%',
     paddingHorizontal: s(4),
+    gap: vs(12),
   },
   playerProgressSectionLandscape: {
     paddingHorizontal: s(12),
