@@ -28,6 +28,7 @@ import { s, vs, ms, clamp, msc } from '@/lib/responsive';
 import { t, resolveLang } from '@/lib/i18n';
 import { usePrefs } from '@/context/PrefsContext';
 import { useSessionStats, CompletedSession } from '@/context/SessionStatsContext';
+import { useTasks, Task } from '@/context/TasksContext';
 import { useRouter } from 'expo-router';
 import { useTheme } from '@/context/ThemeContext';
 import { Palette } from '@/lib/theme';
@@ -115,6 +116,7 @@ const TimerScreen = () => {
   const { prefs } = usePrefs();
   const uiLang = resolveLang(prefs.language);
   const { stats: sessionStats, recordSession } = useSessionStats();
+  const { tasks, toggleTask: toggleTaskInStore } = useTasks();
   const router = useRouter();
   const { theme } = useTheme();
   const palette = theme.colors;
@@ -126,6 +128,8 @@ const TimerScreen = () => {
   const [sessionFeedback, setSessionFeedback] = useState<CompletedSession | null>(null);
   const lastSessionSeenRef = useRef<string | null>(null);
   const hasHydratedSessionRef = useRef(false);
+  const [followLog, setFollowLog] = useState(true);
+  const logScrollRef = useRef<ScrollView | null>(null);
 
   const modeColors = useMemo(() => ({
     work: palette.secondary,
@@ -250,6 +254,8 @@ const TimerScreen = () => {
   const isWeb = Platform.OS === 'web';
   const webDockHeight = 56;
   const usePlayerLayout = isLandscape;
+  const dockCompact = winW < 640;
+  const showCompactWebText = dockCompact || winW < 760;
   const baseTitleRef = useRef<string | null>(null);
   const circleSize = clamp(
     base * (isCompact && isPortrait ? 0.36 : 0.44),
@@ -624,6 +630,47 @@ const TimerScreen = () => {
     );
   };
 
+  const QuickTasks = () => {
+    const topTasks = tasks.slice(0, 4);
+    return (
+      <View style={styles.section}>
+        <View style={styles.quickTasksHeader}>
+          <Text style={styles.sectionTitle}>{t('stats.quickTasks.title', uiLang)}</Text>
+          <TouchableOpacity onPress={() => router.push('/(tabs)/tasks')}>
+            <Text style={[styles.quickTasksManage, { color: palette.primary }]}>{t('stats.quickTasks.manage', uiLang)}</Text>
+          </TouchableOpacity>
+        </View>
+        {topTasks.length === 0 ? (
+          <Text style={styles.sessionLogEmpty}>{t('stats.quickTasks.empty', uiLang)}</Text>
+        ) : (
+          topTasks.map(task => (
+            <TouchableOpacity
+              key={task.id}
+              style={[styles.quickTaskRow, task.completed && styles.quickTaskRowDone]}
+              onPress={() => toggleTaskInStore(task.id)}
+            >
+              <View style={[styles.checkbox, task.completed && styles.checkedBox]}>
+                {task.completed && <Smile size={ms(14)} color="#000011" strokeWidth={3} />}
+              </View>
+              <Text style={[styles.quickTaskText, task.completed && styles.quickTaskTextDone]} numberOfLines={2}>
+                {task.title}
+              </Text>
+            </TouchableOpacity>
+          ))
+        )}
+      </View>
+    );
+  };
+
+  const InfoHint = ({ text }: { text: string }) => (
+    <View style={styles.infoHint}>
+      <View style={styles.infoBadge}>
+        <Text style={styles.infoBadgeText}>?</Text>
+      </View>
+      <Text style={styles.infoHintText}>{text}</Text>
+    </View>
+  );
+
   const StatsSection = () => {
     const focusMinutes = Math.round(sessionStats.focusSeconds / 60);
     const breakMinutes = Math.round(sessionStats.breakSeconds / 60);
@@ -709,7 +756,8 @@ const TimerScreen = () => {
 
     const sessionLog = useMemo(() => {
       const locale = uiLang === 'tr' ? 'tr-TR' : 'en-US';
-      return (sessionStats.completedSessions ?? []).slice(0, 14).map(entry => {
+      const ordered = (sessionStats.completedSessions ?? []).slice(0, 50).reverse();
+      return ordered.map(entry => {
         const stamp = new Date(entry.completedAt);
         const timeLabel = stamp.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' });
         const durationMin = Math.max(1, Math.round(entry.durationSeconds / 60));
@@ -811,6 +859,11 @@ const TimerScreen = () => {
 
       <View style={styles.content}>
         <SessionFeedbackBanner />
+        <QuickTasks />
+        <View style={styles.infoRow}>
+          <InfoHint text={t('stats.info.productivity', uiLang)} />
+          <InfoHint text={t('stats.info.score', uiLang)} />
+        </View>
 
         <View style={styles.statsGrid}>
           <View style={[styles.statCard, styles.levelCard, { borderColor: palette.accent }]}>
@@ -962,7 +1015,25 @@ const TimerScreen = () => {
               <Text style={styles.achievementCounter}>{sessionStats.completedSessions.length} {t('label.sessions', uiLang)}</Text>
             </View>
             <View style={styles.sessionLogContainer}>
-              <ScrollView style={styles.sessionLogConsole}>
+              <View style={styles.sessionLogToolbar}>
+                <TouchableOpacity
+                  onPress={() => setFollowLog(prev => !prev)}
+                  style={[styles.followChip, followLog && { borderColor: palette.accent, backgroundColor: `${palette.accent}22` }]}
+                >
+                  <Text style={[styles.followChipText, { color: followLog ? palette.accent : palette.text }]}>
+                    {followLog ? t('stats.sessionLog.following', uiLang) : t('stats.sessionLog.follow', uiLang)}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+              <ScrollView
+                ref={ref => { logScrollRef.current = ref; }}
+                style={styles.sessionLogConsole}
+                onContentSizeChange={() => {
+                  if (followLog) {
+                    requestAnimationFrame(() => logScrollRef.current?.scrollToEnd({ animated: true }));
+                  }
+                }}
+              >
                 {sessionLog.length === 0 ? (
                   <Text style={styles.sessionLogEmpty}>{t('stats.sessionLog.empty', uiLang)}</Text>
                 ) : (
@@ -1002,29 +1073,32 @@ const TimerScreen = () => {
             style={[
               styles.webDock,
               { height: webDockHeight, borderBottomColor: activeModeColor },
+              dockCompact && styles.webDockCompact,
             ]}
           >
-            <Text style={styles.webDockMode}>{t(`settings.${mode}`, uiLang)}</Text>
-            <Text style={[styles.webDockTime, { color: activeModeColor }]}>{formatTime(timeLeft)}</Text>
-            <View style={styles.webDockControls}>
-              <TouchableOpacity
-                accessibilityLabel="Play/Pause (Space or K)"
-                onPress={toggleTimer}
-                style={[styles.webDockBtn, { borderColor: activeModeColor, backgroundColor: `${activeModeColor}22` }]}
-              >
-                {isActive ? (
-                  <Pause size={18} color={activeModeColor} strokeWidth={2} />
-                ) : (
-                  <Play size={18} color={activeModeColor} strokeWidth={2} />
-                )}
-              </TouchableOpacity>
-              <TouchableOpacity
-                accessibilityLabel="Skip (R)"
-                onPress={skipPhase}
-                style={[styles.webDockBtn, { borderColor: activeModeColor, backgroundColor: `${activeModeColor}22` }]}
-              >
-                <SkipForward size={18} color={activeModeColor} strokeWidth={2} />
-              </TouchableOpacity>
+            <View style={styles.webDockInner}>
+              <Text style={styles.webDockMode}>{t(`settings.${mode}`, uiLang)}</Text>
+              <Text style={[styles.webDockTime, { color: activeModeColor, fontSize: showCompactWebText ? ms(16) : ms(20) }]}>{formatTime(timeLeft)}</Text>
+              <View style={styles.webDockControls}>
+                <TouchableOpacity
+                  accessibilityLabel="Play/Pause (Space or K)"
+                  onPress={toggleTimer}
+                  style={[styles.webDockBtn, dockCompact && styles.webDockBtnCompact, { borderColor: activeModeColor, backgroundColor: `${activeModeColor}22` }]}
+                >
+                  {isActive ? (
+                    <Pause size={dockCompact ? 14 : 18} color={activeModeColor} strokeWidth={2} />
+                  ) : (
+                    <Play size={dockCompact ? 14 : 18} color={activeModeColor} strokeWidth={2} />
+                  )}
+                </TouchableOpacity>
+                <TouchableOpacity
+                  accessibilityLabel="Skip (R)"
+                  onPress={skipPhase}
+                  style={[styles.webDockBtn, dockCompact && styles.webDockBtnCompact, { borderColor: activeModeColor, backgroundColor: `${activeModeColor}22` }]}
+                >
+                  <SkipForward size={dockCompact ? 14 : 18} color={activeModeColor} strokeWidth={2} />
+                </TouchableOpacity>
+              </View>
             </View>
             <View style={styles.webDockProgressBar}>
               <Animated.View
@@ -1039,57 +1113,147 @@ const TimerScreen = () => {
         >
           <View style={{ height: 0 }} />
           
-          {useScrollPresets ? (
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={[styles.presetScrollContent, { paddingBottom: presetSpacing }]}
-            >
-              {presetButtons}
-            </ScrollView>
-          ) : (
-            <View
-              style={[
-                styles.presetRow,
-                usePlayerLayout && { width: '100%', maxWidth: playerMaxWidth },
-                { marginBottom: presetSpacing },
-              ]}
-            >
-              {presetButtons}
-            </View>
-          )}
+          <View style={styles.pageWrapper}>
+            {useScrollPresets ? (
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={[styles.presetScrollContent, { paddingBottom: presetSpacing }]}
+              >
+                {presetButtons}
+              </ScrollView>
+            ) : (
+              <View
+                style={[
+                  styles.presetRow,
+                  usePlayerLayout && { width: '100%', maxWidth: playerMaxWidth },
+                  { marginBottom: presetSpacing },
+                ]}
+              >
+                {presetButtons}
+              </View>
+            )}
 
-          {usePlayerLayout ? (
-            <View
-              style={[
-                styles.playerContainer,
-                {
-                  alignSelf: 'center',
-                  width: '100%',
-                  flexGrow: 1,
-                  maxWidth: playerMaxWidth,
-                  marginTop: playerContainerMarginTop,
-                  gap: playerContainerGap,
-                },
-              ]}
-            >
-              <View style={[styles.playerCard, { borderColor: activeModeColor }]}>
-                <View style={styles.playerInfo}>
-                  <Text style={[styles.playerMode, { color: activeModeColor }]}>
-                    {mode === 'work' ? t('timer.focus', uiLang) : t('timer.break', uiLang)}
-                  </Text>
-                  <Text style={[styles.playerTime, { color: activeModeColor, fontSize: timeSize }]}>
+            {usePlayerLayout ? (
+              <View
+                style={[
+                  styles.playerContainer,
+                  {
+                    alignSelf: 'center',
+                    width: '100%',
+                    flexGrow: 1,
+                    maxWidth: playerMaxWidth,
+                    marginTop: playerContainerMarginTop,
+                    gap: playerContainerGap,
+                  },
+                ]}
+              >
+                <View style={[styles.playerCard, { borderColor: activeModeColor }]}>
+                  <View style={styles.playerInfo}>
+                    <Text style={[styles.playerMode, { color: activeModeColor }]}>
+                      {mode === 'work' ? t('timer.focus', uiLang) : t('timer.break', uiLang)}
+                    </Text>
+                    <Text style={[styles.playerTime, { color: activeModeColor, fontSize: timeSize }]}>
+                      {formatTime(timeLeft)}
+                    </Text>
+                  </View>
+                  <View style={[styles.playerControlsRow, styles.playerControlsRowLandscape]}>
+                    <TouchableOpacity
+                      style={[
+                        styles.playerControlButton,
+                        { width: playerButtonSize, height: playerButtonSize, borderRadius: playerButtonSize / 2, borderColor: activeModeColor, backgroundColor: `${activeModeColor}22` },
+                      ]}
+                      onPress={toggleTimer}
+                    >
+                      {isActive ? (
+                        <Pause size={controlIcon} color={activeModeColor} strokeWidth={2} />
+                      ) : (
+                        <Play size={controlIcon} color={activeModeColor} strokeWidth={2} />
+                      )}
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={[
+                        styles.playerControlButton,
+                        { width: playerButtonSize, height: playerButtonSize, borderRadius: playerButtonSize / 2, borderColor: activeModeColor, backgroundColor: `${activeModeColor}22` },
+                      ]}
+                      onPress={skipPhase}
+                    >
+                      <SkipForward size={controlIcon} color={activeModeColor} strokeWidth={2} />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+
+                <View style={[styles.playerProgressSection, styles.playerProgressSectionLandscape]}>
+                  <View style={styles.playerProgressBar}>
+                    <Animated.View
+                      style={[
+                        styles.playerProgressFill,
+                        {
+                          width: `${progress}%`,
+                          backgroundColor: activeModeColor,
+                        },
+                      ]}
+                    />
+                  </View>
+                  <PomodoroProgressBar
+                    currentPhaseIndex={currentPhaseIndex}
+                    workDuration={prefs.workDuration}
+                    shortBreakDuration={prefs.shortBreakDuration}
+                    longBreakDuration={prefs.longBreakDuration}
+                    palette={palette}
+                  />
+                </View>
+
+                {renderScoreBoard('landscape')}
+              </View>
+            ) : (
+              <View style={styles.timerSection}>
+                <View style={styles.timerCircleContainer}>
+                <Animated.View 
+                  style={[
+                    styles.timerCircle,
+                    {
+                      width: circleSize,
+                      height: circleSize,
+                      borderRadius: circleSize / 2,
+                      transform: [{ scale: pulseAnim }],
+                      borderColor: activeModeColor,
+                      shadowColor: activeModeColor,
+                      backgroundColor: `${activeModeColor}11`,
+                      shadowOpacity: glowAnim,
+                    }
+                  ]}
+                >
+                  <Text style={[styles.timeText, { color: activeModeColor, fontSize: timeSize }]}>
                     {formatTime(timeLeft)}
                   </Text>
+                </Animated.View>
                 </View>
-                <View style={[styles.playerControlsRow, styles.playerControlsRowLandscape]}>
-                  <TouchableOpacity
-                    style={[
-                      styles.playerControlButton,
-                      { width: playerButtonSize, height: playerButtonSize, borderRadius: playerButtonSize / 2, borderColor: activeModeColor, backgroundColor: `${activeModeColor}22` },
-                    ]}
-                    onPress={toggleTimer}
-                  >
+
+                <View style={styles.progressContainer}>
+                  <View style={styles.progressBar}>
+                    <Animated.View 
+                      style={[
+                        styles.progressFill,
+                        { 
+                          width: `${progress}%`,
+                          backgroundColor: activeModeColor,
+                        }
+                      ]} 
+                    />
+                  </View>
+                  <PomodoroProgressBar
+                    currentPhaseIndex={currentPhaseIndex}
+                    workDuration={prefs.workDuration}
+                    shortBreakDuration={prefs.shortBreakDuration}
+                    longBreakDuration={prefs.longBreakDuration}
+                    palette={palette}
+                  />
+                </View>
+
+                <View style={styles.controlButtons}>
+                  <TouchableOpacity style={[styles.controlButton, { width: buttonSize, height: buttonSize, borderRadius: buttonSize / 2, borderColor: activeModeColor, backgroundColor: `${activeModeColor}22` }]} onPress={toggleTimer}>
                     {isActive ? (
                       <Pause size={controlIcon} color={activeModeColor} strokeWidth={2} />
                     ) : (
@@ -1097,105 +1261,17 @@ const TimerScreen = () => {
                     )}
                   </TouchableOpacity>
 
-                  <TouchableOpacity
-                    style={[
-                      styles.playerControlButton,
-                      { width: playerButtonSize, height: playerButtonSize, borderRadius: playerButtonSize / 2, borderColor: activeModeColor, backgroundColor: `${activeModeColor}22` },
-                    ]}
-                    onPress={skipPhase}
-                  >
+                  <TouchableOpacity style={[styles.controlButton, { width: buttonSize, height: buttonSize, borderRadius: buttonSize / 2, borderColor: activeModeColor, backgroundColor: `${activeModeColor}22` }]} onPress={skipPhase}>
                     <SkipForward size={controlIcon} color={activeModeColor} strokeWidth={2} />
                   </TouchableOpacity>
                 </View>
+
+                {renderScoreBoard('portrait')}
               </View>
-
-              <View style={[styles.playerProgressSection, styles.playerProgressSectionLandscape]}>
-                <View style={styles.playerProgressBar}>
-                  <Animated.View
-                    style={[
-                      styles.playerProgressFill,
-                      {
-                        width: `${progress}%`,
-                        backgroundColor: activeModeColor,
-                      },
-                    ]}
-                  />
-                </View>
-                <PomodoroProgressBar
-                  currentPhaseIndex={currentPhaseIndex}
-                  workDuration={prefs.workDuration}
-                  shortBreakDuration={prefs.shortBreakDuration}
-                  longBreakDuration={prefs.longBreakDuration}
-                  palette={palette}
-                />
-              </View>
-
-              {renderScoreBoard('landscape')}
-            </View>
-          ) : (
-            <View style={styles.timerSection}>
-              <View style={styles.timerCircleContainer}>
-              <Animated.View 
-                style={[
-                  styles.timerCircle,
-                  {
-                    width: circleSize,
-                    height: circleSize,
-                    borderRadius: circleSize / 2,
-                    transform: [{ scale: pulseAnim }],
-                    borderColor: activeModeColor,
-                    shadowColor: activeModeColor,
-                    backgroundColor: `${activeModeColor}11`,
-                    shadowOpacity: glowAnim,
-                  }
-                ]}
-              >
-                <Text style={[styles.timeText, { color: activeModeColor, fontSize: timeSize }]}>
-                  {formatTime(timeLeft)}
-                </Text>
-              </Animated.View>
-              </View>
-
-              <View style={styles.progressContainer}>
-                <View style={styles.progressBar}>
-                  <Animated.View 
-                    style={[
-                      styles.progressFill,
-                      { 
-                        width: `${progress}%`,
-                        backgroundColor: activeModeColor,
-                      }
-                    ]} 
-                  />
-                </View>
-                <PomodoroProgressBar
-                  currentPhaseIndex={currentPhaseIndex}
-                  workDuration={prefs.workDuration}
-                  shortBreakDuration={prefs.shortBreakDuration}
-                  longBreakDuration={prefs.longBreakDuration}
-                  palette={palette}
-                />
-              </View>
-
-              <View style={styles.controlButtons}>
-                <TouchableOpacity style={[styles.controlButton, { width: buttonSize, height: buttonSize, borderRadius: buttonSize / 2, borderColor: activeModeColor, backgroundColor: `${activeModeColor}22` }]} onPress={toggleTimer}>
-                  {isActive ? (
-                    <Pause size={controlIcon} color={activeModeColor} strokeWidth={2} />
-                  ) : (
-                    <Play size={controlIcon} color={activeModeColor} strokeWidth={2} />
-                  )}
-                </TouchableOpacity>
-
-                <TouchableOpacity style={[styles.controlButton, { width: buttonSize, height: buttonSize, borderRadius: buttonSize / 2, borderColor: activeModeColor, backgroundColor: `${activeModeColor}22` }]} onPress={skipPhase}>
-                  <SkipForward size={controlIcon} color={activeModeColor} strokeWidth={2} />
-                </TouchableOpacity>
-              </View>
-
-              {renderScoreBoard('portrait')}
-            </View>
-          )}
-          <StatsSection />
-          <AppTitle />
+            )}
+            <StatsSection />
+            <AppTitle />
+          </View>
         </ScrollView>
         {showShortcuts && (
           <View style={styles.shortcutOverlay}>
@@ -1214,6 +1290,7 @@ const TimerScreen = () => {
         </>
       ) : (
         <ScrollView contentContainerStyle={{ paddingBottom: vs(24) }}>
+          <View style={styles.pageWrapper}>
           {useScrollPresets ? (
             <ScrollView
               horizontal
@@ -1371,7 +1448,8 @@ const TimerScreen = () => {
           )}
           <StatsSection />
           <AppTitle />
-        </ScrollView>
+        </View>
+      </ScrollView>
       )}
 
     </LinearGradient>
@@ -1434,6 +1512,47 @@ const makeStyles = (palette: any) => StyleSheet.create({
     fontSize: ms(12),
     color: '#C3C7FF',
     letterSpacing: 1,
+  },
+  infoRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: s(10),
+    marginBottom: vs(12),
+    alignItems: 'center',
+  },
+  infoHint: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: s(8),
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    paddingHorizontal: s(10),
+    paddingVertical: s(8),
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#2E2E5A',
+  },
+  infoBadge: {
+    width: s(18),
+    height: s(18),
+    borderRadius: s(9),
+    backgroundColor: '#333366',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  infoBadgeText: {
+    fontFamily: FONT_BOLD,
+    color: '#C3C7FF',
+    fontSize: ms(10),
+  },
+  infoHintText: {
+    fontFamily: FONT_SEMIBOLD,
+    fontSize: ms(11),
+    color: '#C3C7FF',
+  },
+  pageWrapper: {
+    width: '100%',
+    maxWidth: 1120,
+    alignSelf: 'center',
   },
   feedbackCard: {
     borderWidth: 2,
@@ -1531,6 +1650,20 @@ const makeStyles = (palette: any) => StyleSheet.create({
   },
   presetTextActive: {
     fontFamily: FONT_SEMIBOLD,
+  },
+  checkbox: {
+    width: s(20),
+    height: s(20),
+    borderRadius: s(10),
+    borderWidth: 2,
+    borderColor: '#00FFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'transparent',
+  },
+  checkedBox: {
+    backgroundColor: '#00FFFF',
+    borderColor: '#00FFFF',
   },
   title: {
     fontFamily: FONT_BOLD,
@@ -1769,6 +1902,37 @@ const makeStyles = (palette: any) => StyleSheet.create({
     alignItems: 'center',
     marginBottom: vs(12),
   },
+  quickTasksHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: vs(8),
+  },
+  quickTasksManage: {
+    fontFamily: FONT_SEMIBOLD,
+    fontSize: ms(11),
+    textDecorationLine: 'underline',
+  },
+  quickTaskRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: s(10),
+    paddingVertical: vs(8),
+    borderBottomWidth: 1,
+    borderColor: '#222244',
+  },
+  quickTaskRowDone: {
+    opacity: 0.6,
+  },
+  quickTaskText: {
+    fontFamily: FONT_SEMIBOLD,
+    fontSize: ms(12),
+    color: '#FFFFFF',
+    flex: 1,
+  },
+  quickTaskTextDone: {
+    textDecorationLine: 'line-through',
+  },
   levelCard: {
     alignItems: 'stretch',
     gap: vs(8),
@@ -1909,7 +2073,7 @@ const makeStyles = (palette: any) => StyleSheet.create({
     marginTop: vs(8),
   },
   dailyAchievementsScroll: {
-    maxHeight: vs(220),
+    maxHeight: vs(320),
     marginTop: vs(12),
   },
   dailyAchievementCard: {
@@ -1967,12 +2131,29 @@ const makeStyles = (palette: any) => StyleSheet.create({
     textTransform: 'uppercase',
   },
   sessionLogContainer: {
-    height: vs(200),
+    height: vs(220),
     backgroundColor: 'rgba(0,0,0,0.5)',
     borderRadius: 8,
     borderColor: '#00FFFF',
     borderWidth: 1,
     padding: s(8),
+  },
+  sessionLogToolbar: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    marginBottom: vs(6),
+  },
+  followChip: {
+    paddingHorizontal: s(10),
+    paddingVertical: s(6),
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#444',
+    backgroundColor: 'rgba(255,255,255,0.04)',
+  },
+  followChipText: {
+    fontFamily: FONT_SEMIBOLD,
+    fontSize: ms(11),
   },
   sessionLogConsole: {
     flex: 1,
@@ -1998,6 +2179,18 @@ const makeStyles = (palette: any) => StyleSheet.create({
     backgroundColor: 'rgba(0,0,20,0.9)',
     borderBottomWidth: 2,
     paddingHorizontal: s(12),
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: s(12),
+  },
+  webDockCompact: {
+    paddingHorizontal: s(8),
+    gap: s(8),
+  },
+  webDockInner: {
+    width: '100%',
+    maxWidth: 1120,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -2026,6 +2219,11 @@ const makeStyles = (palette: any) => StyleSheet.create({
     borderWidth: 2,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  webDockBtnCompact: {
+    width: s(28),
+    height: s(28),
+    borderRadius: s(14),
   },
   webDockProgressBar: {
     position: 'absolute',
