@@ -9,10 +9,11 @@ import { useTheme } from '@/context/ThemeContext';
 const FONT_SEMIBOLD = 'Poppins-SemiBold';
 
 export default function TabLayout() {
-  const { width } = useWindowDimensions();
+  const { width, height } = useWindowDimensions();
+  const isLandscape = width > height;
   const isTablet = width >= 768;
-  const tabHeight = clamp(s(56), 52, 64);
-  const tabPaddingV = clamp(s(8), 6, 10);
+  const tabHeight = clamp(s(isLandscape ? 48 : 56), 44, 64);
+  const tabPaddingV = clamp(s(isLandscape ? 6 : 8), 4, 10);
   const labelSize = msc(isTablet ? 12 : 11, 10, 12);
   const { prefs } = usePrefs();
   const uiLang = resolveLang(prefs.language);
