@@ -123,6 +123,9 @@ const TimerScreen = () => {
   const totalScore = sessionStats.totalScore;
   const focusSeconds = sessionStats.focusSeconds;
   const breakSeconds = sessionStats.breakSeconds;
+  const [sessionFeedback, setSessionFeedback] = useState<CompletedSession | null>(null);
+  const lastSessionSeenRef = useRef<string | null>(null);
+  const hasHydratedSessionRef = useRef(false);
 
   const modeColors = useMemo(() => ({
     work: palette.secondary,
@@ -215,6 +218,13 @@ const TimerScreen = () => {
     palette.warning,
   ]);
 
+  const scorePerLevel = 120;
+  const level = Math.max(1, Math.floor(totalScore / scorePerLevel) + 1);
+  const levelBaseScore = (level - 1) * scorePerLevel;
+  const xpIntoLevel = Math.max(0, totalScore - levelBaseScore);
+  const xpToNextLevel = Math.max(0, scorePerLevel - xpIntoLevel);
+  const levelProgress = clamp((xpIntoLevel / scorePerLevel) * 100, 0, 100);
+
   const workSec = Math.max(1, prefs.workDuration) * 60;
   const shortSec = Math.max(1, prefs.shortBreakDuration) * 60;
   const longSec = Math.max(1, prefs.longBreakDuration) * 60;
@@ -296,6 +306,28 @@ const TimerScreen = () => {
   useEffect(() => {
     setTimeLeft(presetTimes[mode]);
   }, [mode, workSec, shortSec, longSec]);
+
+  useEffect(() => {
+    const latest = sessionStats.completedSessions?.[0];
+    if (!hasHydratedSessionRef.current) {
+      hasHydratedSessionRef.current = true;
+      if (latest) {
+        lastSessionSeenRef.current = latest.id;
+      }
+      return;
+    }
+
+    if (latest && latest.id !== lastSessionSeenRef.current) {
+      setSessionFeedback(latest);
+      lastSessionSeenRef.current = latest.id;
+    }
+  }, [sessionStats.completedSessions]);
+
+  useEffect(() => {
+    if (!sessionFeedback) return;
+    const timer = setTimeout(() => setSessionFeedback(null), 8000);
+    return () => clearTimeout(timer);
+  }, [sessionFeedback]);
 
   useEffect(() => {
     if (isActive) {
@@ -543,6 +575,55 @@ const TimerScreen = () => {
     </View>
   );
 
+  const SessionFeedbackBanner = () => {
+    if (!sessionFeedback) return null;
+
+    const modeLabel =
+      sessionFeedback.mode === 'work'
+        ? t('settings.work', uiLang)
+        : sessionFeedback.mode === 'short'
+          ? t('settings.shortBreak', uiLang)
+          : t('settings.longBreak', uiLang);
+
+    const durationMin = Math.round(sessionFeedback.durationSeconds / 60);
+    const bonusParts: string[] = [];
+    if (sessionFeedback.streakBonus) bonusParts.push(`${t('stats.sessionFeedback.streak', uiLang)} +${sessionFeedback.streakBonus}`);
+    if (sessionFeedback.comboBonus) bonusParts.push(`${t('stats.sessionFeedback.combo', uiLang)} +${sessionFeedback.comboBonus}`);
+
+    const levelHint = xpToNextLevel <= sessionFeedback.scoreEarned
+      ? t('stats.sessionFeedback.levelUp', uiLang)
+      : uiLang === 'tr'
+        ? `${xpToNextLevel} XP sonra seviye`
+        : `${xpToNextLevel} XP to next level`;
+
+    return (
+      <View style={[styles.feedbackCard, { borderColor: activeModeColor, backgroundColor: `${activeModeColor}12` }]}>
+        <View style={styles.feedbackHeader}>
+          <Text style={[styles.feedbackTitle, { color: activeModeColor }]}>{t('stats.sessionFeedback.title', uiLang)}</Text>
+          <TouchableOpacity onPress={() => setSessionFeedback(null)} style={styles.feedbackCloseBtn}>
+            <Text style={[styles.feedbackCloseText, { color: palette.text }]}>x</Text>
+          </TouchableOpacity>
+        </View>
+        <Text style={styles.feedbackText}>
+          {modeLabel} | {durationMin}m | +{sessionFeedback.scoreEarned} XP
+        </Text>
+        {bonusParts.length > 0 && (
+          <Text style={styles.feedbackSubtext}>{bonusParts.join(' | ')}</Text>
+        )}
+        <View style={styles.progressBarTrack}>
+          <View
+            style={[
+              styles.progressBarFill,
+              styles.levelProgressFill,
+              { width: `${levelProgress}%`, backgroundColor: palette.accent },
+            ]}
+          />
+        </View>
+        <Text style={styles.feedbackSubtext}>{levelHint}</Text>
+      </View>
+    );
+  };
+
   const StatsSection = () => {
     const focusMinutes = Math.round(sessionStats.focusSeconds / 60);
     const breakMinutes = Math.round(sessionStats.breakSeconds / 60);
@@ -625,21 +706,137 @@ const TimerScreen = () => {
         longBreaks: palette.success,
         completedTasks: palette.accent,
     };
+
+    const sessionLog = useMemo(() => {
+      const locale = uiLang === 'tr' ? 'tr-TR' : 'en-US';
+      return (sessionStats.completedSessions ?? []).slice(0, 14).map(entry => {
+        const stamp = new Date(entry.completedAt);
+        const timeLabel = stamp.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' });
+        const durationMin = Math.max(1, Math.round(entry.durationSeconds / 60));
+        const modeLabel = entry.mode === 'work'
+          ? t('settings.work', uiLang)
+          : entry.mode === 'short'
+            ? t('settings.shortBreak', uiLang)
+            : t('settings.longBreak', uiLang);
+        const scoreGain = entry.scoreEarned ?? (entry.mode === 'work' ? 10 : entry.mode === 'short' ? 2 : 5);
+        const bonus = (entry.streakBonus ?? 0) + (entry.comboBonus ?? 0);
+        const bonusLabel = bonus > 0 ? ` (+${bonus})` : '';
+        return {
+          id: entry.id,
+          text: `[${timeLabel}] ${modeLabel} | ${durationMin}m | +${scoreGain}${bonusLabel} XP`,
+        };
+      });
+    }, [sessionStats.completedSessions, uiLang]);
+
+    const { dailySummaries, averageFocus, averageBreak } = useMemo(() => {
+      const grouped: Record<string, {
+        focusSeconds: number;
+        breakSeconds: number;
+        sessions: number;
+        work: number;
+        short: number;
+        long: number;
+      }> = {};
+
+      (sessionStats.completedSessions ?? []).forEach(entry => {
+        const day = (entry.completedAt || '').slice(0, 10);
+        if (!grouped[day]) {
+          grouped[day] = { focusSeconds: 0, breakSeconds: 0, sessions: 0, work: 0, short: 0, long: 0 };
+        }
+        grouped[day].sessions += 1;
+        if (entry.mode === 'work') {
+          grouped[day].work += 1;
+          grouped[day].focusSeconds += entry.durationSeconds;
+        } else {
+          grouped[day].breakSeconds += entry.durationSeconds;
+          if (entry.mode === 'short') grouped[day].short += 1;
+          if (entry.mode === 'long') grouped[day].long += 1;
+        }
+      });
+
+      const summaries = Object.entries(grouped).map(([day, data]) => {
+        const focusMinutes = Math.round(data.focusSeconds / 60);
+        const breakMinutes = Math.round(data.breakSeconds / 60);
+        const totalMinutes = Math.max(1, focusMinutes + breakMinutes);
+        const productivity = Math.round((focusMinutes / totalMinutes) * 100);
+        const badges: string[] = [];
+        if (focusMinutes >= 120 || data.work >= 6) badges.push('focusLegend');
+        else if (focusMinutes >= 60) badges.push('focusPro');
+        if (productivity >= 65 && breakMinutes > 0) badges.push('breakEfficient');
+        if (productivity >= 45 && productivity <= 65 && data.sessions >= 4) badges.push('balanced');
+        if (productivity < 40 && data.sessions >= 3) badges.push('recovery');
+        if (data.sessions >= 4 && productivity >= 40) badges.push('steady');
+
+        return {
+          day,
+          focusMinutes,
+          breakMinutes,
+          sessions: data.sessions,
+          workSessions: data.work,
+          shortSessions: data.short,
+          longSessions: data.long,
+          badges,
+        };
+      }).sort((a, b) => b.day.localeCompare(a.day));
+
+      const averageFocusValue = summaries.reduce((sum, item) => sum + item.focusMinutes, 0) / Math.max(1, summaries.length);
+      const averageBreakValue = summaries.reduce((sum, item) => sum + item.breakMinutes, 0) / Math.max(1, summaries.length);
+
+      return {
+        dailySummaries: summaries.slice(0, 7),
+        averageFocus: Math.round(averageFocusValue),
+        averageBreak: Math.round(averageBreakValue),
+      };
+    }, [sessionStats.completedSessions]);
+
+    const averageLabel = t('stats.dailyAchievements.averageLabel', uiLang)
+      .replace('{focus}', `${averageFocus}m`)
+      .replace('{break}', `${averageBreak}m`);
+
+    const formatDayLabel = (day: string) => {
+      const locale = uiLang === 'tr' ? 'tr-TR' : 'en-US';
+      return new Date(`${day}T12:00:00Z`).toLocaleDateString(locale, {
+        weekday: 'short',
+        month: 'short',
+        day: 'numeric',
+      });
+    };
   
     return (
       <View style={{marginTop: vs(24)}}>
         <View style={styles.statsHeader}>
-          <Text style={styles.statsTitle}>{t('stats.title', uiLang)}</Text>
-          <Text style={styles.statsSubtitle}>{t('stats.subtitle', uiLang)}</Text>
-        </View>
-  
-        <View style={styles.content}>
-          <View style={styles.statsGrid}>
-            <StatCard
-              icon={<ClockIcon size={32} color="#FF00FF" strokeWidth={2} />}
-              title={t('stats.focusTime', uiLang)}
-              value={formatTime(focusMinutes)}
-              subtitle={t('stats.focusSubtitle', uiLang)}
+        <Text style={styles.statsTitle}>{t('stats.title', uiLang)}</Text>
+        <Text style={styles.statsSubtitle}>{t('stats.subtitle', uiLang)}</Text>
+      </View>
+
+      <View style={styles.content}>
+        <SessionFeedbackBanner />
+
+        <View style={styles.statsGrid}>
+          <View style={[styles.statCard, styles.levelCard, { borderColor: palette.accent }]}>
+            <View style={styles.levelHeader}>
+              <Text style={styles.statTitle}>{t('stats.level', uiLang)}</Text>
+              <Text style={[styles.levelValue, { color: palette.accent }]}>L{level}</Text>
+            </View>
+            <View style={styles.progressBarTrack}>
+              <View
+                style={[
+                  styles.progressBarFill,
+                  styles.levelProgressFill,
+                  { width: `${levelProgress}%`, backgroundColor: palette.accent },
+                ]}
+              />
+            </View>
+            <Text style={styles.progressPercentage}>{xpIntoLevel}/{scorePerLevel} XP</Text>
+            <Text style={styles.levelHint}>
+              {uiLang === 'tr' ? `${xpToNextLevel} XP sonraki seviye` : `${xpToNextLevel} XP to next level`}
+            </Text>
+          </View>
+          <StatCard
+            icon={<ClockIcon size={32} color="#FF00FF" strokeWidth={2} />}
+            title={t('stats.focusTime', uiLang)}
+            value={formatTime(focusMinutes)}
+            subtitle={t('stats.focusSubtitle', uiLang)}
               color="#FF00FF"
             />
             <StatCard
@@ -712,11 +909,69 @@ const TimerScreen = () => {
               <ProgressBar
                 key={goal.id}
                 label={t(`stats.dailyGoals.${goal.id}`, uiLang, goal.id)}
-                percentage={goal.target > 0 ? (goal.progress / goal.target) * 100 : 0}
-                detail={`${goal.progress}/${goal.target}`}
-                color={goalColors[goal.id] ?? palette.warning}
-              />
+              percentage={goal.target > 0 ? (goal.progress / goal.target) * 100 : 0}
+              detail={`${goal.progress}/${goal.target}`}
+              color={goalColors[goal.id] ?? palette.warning}
+            />
             ))}
+          </View>
+
+          <View style={styles.section}>
+            <View style={styles.achievementHeader}>
+              <Text style={styles.sectionTitle}>{t('stats.dailyAchievements.title', uiLang)}</Text>
+              <Text style={styles.dailyAverageLabel}>{averageLabel}</Text>
+            </View>
+            <ScrollView style={styles.dailyAchievementsScroll} nestedScrollEnabled>
+              {dailySummaries.length === 0 ? (
+                <Text style={styles.sessionLogEmpty}>{t('stats.dailyAchievements.empty', uiLang)}</Text>
+              ) : (
+                dailySummaries.map(day => (
+                  <View key={day.day} style={styles.dailyAchievementCard}>
+                    <View style={styles.dailyAchievementHeader}>
+                      <Text style={styles.dailyAchievementDate}>{formatDayLabel(day.day)}</Text>
+                      <Text style={styles.dailyAchievementSessions}>{day.sessions} {t('label.sessions', uiLang)}</Text>
+                    </View>
+                    <View style={styles.dailyAchievementStats}>
+                      <Text style={styles.dailyAchievementStat}>{t('stats.focusTime', uiLang)}: {day.focusMinutes}m</Text>
+                      <Text style={styles.dailyAchievementStat}>{t('stats.breakTime', uiLang)}: {day.breakMinutes}m</Text>
+                    </View>
+                    <View style={styles.dailyAchievementStats}>
+                      <Text style={styles.dailyAchievementStat}>{t('stats.workSessions', uiLang)}: {day.workSessions}</Text>
+                      <Text style={styles.dailyAchievementStat}>{t('stats.longBreaks', uiLang)}: {day.longSessions}</Text>
+                    </View>
+                    <View style={styles.dailyAchievementBadges}>
+                      {day.badges.length === 0 ? (
+                        <Text style={styles.sessionLogEmpty}>{t('stats.unlockedCountLabel', uiLang)}</Text>
+                      ) : (
+                        day.badges.map(badgeId => (
+                          <View key={badgeId} style={styles.dailyAchievementBadge}>
+                            <Text style={styles.dailyAchievementBadgeText}>{t(`stats.dailyAchievements.badge.${badgeId}`, uiLang)}</Text>
+                          </View>
+                        ))
+                      )}
+                    </View>
+                  </View>
+                ))
+              )}
+            </ScrollView>
+          </View>
+
+          <View style={styles.section}>
+            <View style={styles.achievementHeader}>
+              <Text style={styles.sectionTitle}>{t('stats.sessionLog.title', uiLang)}</Text>
+              <Text style={styles.achievementCounter}>{sessionStats.completedSessions.length} {t('label.sessions', uiLang)}</Text>
+            </View>
+            <View style={styles.sessionLogContainer}>
+              <ScrollView style={styles.sessionLogConsole}>
+                {sessionLog.length === 0 ? (
+                  <Text style={styles.sessionLogEmpty}>{t('stats.sessionLog.empty', uiLang)}</Text>
+                ) : (
+                  sessionLog.map(entry => (
+                    <Text key={entry.id} style={styles.sessionLogEntry}>{entry.text}</Text>
+                  ))
+                )}
+              </ScrollView>
+            </View>
           </View>
         </View>
       </View>
@@ -1180,6 +1435,48 @@ const makeStyles = (palette: any) => StyleSheet.create({
     color: '#C3C7FF',
     letterSpacing: 1,
   },
+  feedbackCard: {
+    borderWidth: 2,
+    borderRadius: 12,
+    padding: s(12),
+    marginBottom: vs(12),
+    backgroundColor: 'rgba(255,255,255,0.04)',
+  },
+  feedbackHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: vs(6),
+  },
+  feedbackTitle: {
+    fontFamily: FONT_BOLD,
+    fontSize: ms(13),
+    letterSpacing: 1,
+  },
+  feedbackText: {
+    fontFamily: FONT_SEMIBOLD,
+    fontSize: ms(12),
+    color: '#FFFFFF',
+  },
+  feedbackSubtext: {
+    fontFamily: FONT_REGULAR,
+    fontSize: ms(11),
+    color: '#C3C7FF',
+    marginTop: vs(4),
+    marginBottom: vs(6),
+  },
+  feedbackCloseBtn: {
+    width: s(24),
+    height: s(24),
+    borderRadius: s(12),
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.08)',
+  },
+  feedbackCloseText: {
+    fontFamily: FONT_BOLD,
+    fontSize: ms(12),
+  },
   headerCompact: {
     paddingVertical: vs(6),
   },
@@ -1471,6 +1768,27 @@ const makeStyles = (palette: any) => StyleSheet.create({
     padding: s(12),
     alignItems: 'center',
     marginBottom: vs(12),
+  },
+  levelCard: {
+    alignItems: 'stretch',
+    gap: vs(8),
+  },
+  levelHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  levelValue: {
+    fontFamily: FONT_BOLD,
+    fontSize: ms(20),
+  },
+  levelHint: {
+    fontFamily: FONT_SEMIBOLD,
+    fontSize: ms(11),
+    color: '#C3C7FF',
+  },
+  levelProgressFill: {
+    height: '100%',
   },
   iconContainer: {
     width: s(54),

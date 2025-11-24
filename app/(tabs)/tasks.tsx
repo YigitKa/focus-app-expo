@@ -13,6 +13,7 @@ import { s, vs, ms } from '@/lib/responsive';
 import { t, resolveLang } from '@/lib/i18n';
 import { usePrefs } from '@/context/PrefsContext';
 import { useTasks, Task } from '@/context/TasksContext';
+import { useSessionStats } from '@/context/SessionStatsContext';
 import { useTheme } from '@/context/ThemeContext';
 const FONT_REGULAR = 'Poppins-Regular';
 const FONT_MEDIUM = 'Poppins-Medium';
@@ -25,6 +26,7 @@ export default function TasksScreen() {
   const { theme } = useTheme();
   const palette = theme.colors;
   const { tasks, addTask: addTaskToStore, toggleTask: toggleTaskInStore, deleteTask: deleteTaskFromStore } = useTasks();
+  const { incrementCompletedTasks } = useSessionStats();
   const [newTaskText, setNewTaskText] = useState('');
   const [isAddingTask, setIsAddingTask] = useState(false);
 
@@ -36,8 +38,11 @@ export default function TasksScreen() {
     }
   };
 
-  const toggleTask = (id: string) => {
+  const toggleTask = (id: string, wasCompleted: boolean) => {
     toggleTaskInStore(id);
+    if (!wasCompleted) {
+      incrementCompletedTasks(1);
+    }
   };
 
   const deleteTask = (id: string) => {
@@ -50,7 +55,7 @@ export default function TasksScreen() {
     <View style={[styles.taskItem, item.completed && styles.completedTask]}>
       <TouchableOpacity
         style={[styles.checkbox, item.completed && styles.checkedBox]}
-        onPress={() => toggleTask(item.id)}
+        onPress={() => toggleTask(item.id, item.completed)}
       >
         {item.completed && <Check size={ms(14)} color="#000011" strokeWidth={3} />}
       </TouchableOpacity>

@@ -17,6 +17,9 @@ export type CompletedSession = {
   mode: SessionMode;
   durationSeconds: number;
   completedAt: string;
+  scoreEarned: number;
+  streakBonus?: number;
+  comboBonus?: number;
 };
 
 export type SessionStats = {
@@ -104,6 +107,13 @@ function diffInDays(current: string, previous: string) {
 }
 
 function mergeStats(partial: Partial<SessionStats>): SessionStats {
+  const completedSessions = (partial.completedSessions ?? []).map(session => ({
+    ...session,
+    scoreEarned: session.scoreEarned ?? SCORE_WEIGHTS[session.mode] ?? 0,
+    streakBonus: session.streakBonus ?? 0,
+    comboBonus: session.comboBonus ?? 0,
+  }));
+
   const merged = {
     ...DEFAULT_STATS,
     ...partial,
@@ -115,7 +125,7 @@ function mergeStats(partial: Partial<SessionStats>): SessionStats {
       ...DEFAULT_STATS.dailyGoals,
       ...partial.dailyGoals,
     },
-    completedSessions: partial.completedSessions ?? [],
+    completedSessions,
   };
   if (merged.completedSessions.length > MAX_SESSION_LOG) {
     merged.completedSessions = merged.completedSessions.slice(0, MAX_SESSION_LOG);
@@ -178,15 +188,6 @@ export function SessionStatsProvider({ children }: { children: React.ReactNode }
           dailyGoals.longBreaks.progress += 1;
         }
 
-        const newSession: CompletedSession = {
-          id: completedAtISO,
-          mode,
-          durationSeconds,
-          completedAt: completedAtISO,
-        };
-
-        const nextCompletedSessions = [newSession, ...(prev.completedSessions ?? [])].slice(0, MAX_SESSION_LOG);
-
         const totals: Record<SessionMode, number> = {
           ...prev.totals,
           [mode]: prev.totals[mode] + 1,
@@ -229,6 +230,18 @@ export function SessionStatsProvider({ children }: { children: React.ReactNode }
 
         const baseScore = SCORE_WEIGHTS[mode];
         const totalScore = prev.totalScore + baseScore + streakBonus + comboBonus;
+
+        const newSession: CompletedSession = {
+          id: completedAtISO,
+          mode,
+          durationSeconds,
+          completedAt: completedAtISO,
+          scoreEarned: baseScore + streakBonus + comboBonus,
+          streakBonus,
+          comboBonus,
+        };
+
+        const nextCompletedSessions = [newSession, ...(prev.completedSessions ?? [])].slice(0, MAX_SESSION_LOG);
 
         const nextStats: SessionStats = {
           ...prev,
